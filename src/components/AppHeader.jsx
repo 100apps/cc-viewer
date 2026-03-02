@@ -1,6 +1,7 @@
 import React from 'react';
 import { Space, Tag, Button, Badge, Typography, Dropdown, Popover, Modal, Collapse, Drawer, Switch, Tabs, Spin, Tooltip } from 'antd';
 import { MessageOutlined, FileTextOutlined, ImportOutlined, DownOutlined, DashboardOutlined, ExportOutlined, DownloadOutlined, SettingOutlined, BarChartOutlined, CodeOutlined } from '@ant-design/icons';
+import { QRCodeCanvas } from 'qrcode.react';
 import { formatTokenCount, computeTokenStats, computeCacheRebuildStats, computeToolUsageStats, computeSkillUsageStats } from '../utils/helpers';
 import { isSystemText, classifyUserContent, isMainAgent } from '../utils/contentFilter';
 import { classifyRequest, formatRequestTag } from '../utils/requestType';
@@ -34,7 +35,7 @@ const { Text } = Typography;
 class AppHeader extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { countdownText: '', promptModalVisible: false, promptData: [], promptViewMode: 'original', settingsDrawerVisible: false, globalSettingsVisible: false, projectStatsVisible: false, projectStats: null, projectStatsLoading: false };
+    this.state = { countdownText: '', promptModalVisible: false, promptData: [], promptViewMode: 'original', settingsDrawerVisible: false, globalSettingsVisible: false, projectStatsVisible: false, projectStats: null, projectStatsLoading: false, localUrl: '' };
     this._rafId = null;
     this._expiredTimer = null;
     this.updateCountdown = this.updateCountdown.bind(this);
@@ -42,6 +43,9 @@ class AppHeader extends React.Component {
 
   componentDidMount() {
     this.startCountdown();
+    fetch('/api/local-url').then(r => r.json()).then(data => {
+      if (data.url) this.setState({ localUrl: data.url });
+    }).catch(() => {});
   }
 
   componentDidUpdate(prevProps) {
@@ -678,7 +682,11 @@ class AppHeader extends React.Component {
             </Tag>
           </Popover>
           {(() => {
-            const inflightReqs = isLocalLog ? [] : (requests || []).filter(r => !r.response);
+            const INFLIGHT_TIMEOUT = 5 * 60 * 1000; // 5 分钟超时，视为失败请求
+            const now = Date.now();
+            const inflightReqs = isLocalLog ? [] : (requests || []).filter(r =>
+              !r.response && (now - new Date(r.timestamp).getTime()) < INFLIGHT_TIMEOUT
+            );
             const hasInflight = inflightReqs.length > 0;
             const liveDot = !isLocalLog ? (
               hasInflight ? (
@@ -842,6 +850,12 @@ class AppHeader extends React.Component {
           open={this.state.settingsDrawerVisible}
           onClose={() => this.setState({ settingsDrawerVisible: false })}
         >
+          {this.state.localUrl && (
+            <div className={styles.qrcodeSection}>
+              <QRCodeCanvas value={this.state.localUrl} size={160} bgColor="#141414" fgColor="#d9d9d9" level="M" />
+              <div className={styles.qrcodeUrl}>{this.state.localUrl}</div>
+            </div>
+          )}
           <div className={styles.settingsItem}>
             <span className={styles.settingsLabel}>{t('ui.collapseToolResults')}</span>
             <Switch

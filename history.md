@@ -1,15 +1,39 @@
 # Changelog
 
-## 1.4.3 (2026-03-02)
+## 1.4.6 (2026-03-03)
 
 - Fix: Native mode shell hook now passthrough non-API commands directly without ccv interception
 - Added passthrough list for subcommands: `doctor`, `install`, `update`, `upgrade`, `auth`, `setup-token`, `agents`, `plugin`, `mcp`
 - Added passthrough list for flags: `--version`, `-v`, `--v`, `--help`, `-h`
 - These commands don't involve API calls and don't need proxy/logging
 
+## 1.4.5 (2026-03-03)
+
+- Feat: LAN access with token-based security — server listens on 0.0.0.0 with random token for non-localhost requests
+- Feat: token interceptor — auto-attaches URL token to all fetch/EventSource/WebSocket requests from mobile
+- Fix: WebSocket terminal input broken after token interceptor replaced WebSocket constructor without preserving static constants (OPEN/CLOSED)
+- Fix: WebSocket upgrade requests intercepted by handleRequest returning HTML instead of 101 handshake
+- Fix: port probe before binding 0.0.0.0 to avoid conflict with existing 127.0.0.1 listeners
+- Static assets (JS/CSS/favicon) exempt from token validation
+
+## 1.4.4 (2026-03-02)
+
+- Feat: QR code in Display Settings drawer — scan to access cc-viewer from mobile on LAN
+- Feat: `/api/local-url` endpoint returns local network IP and port
+- UI: rename "Settings" to "Display Settings" with i18n updates
+
+## 1.4.3 (2026-03-02)
+
+- Feat: mobile CLI mode — full-screen terminal with status bar showing live monitoring project name
+- Feat: mobile virtual keybar — ↑ ↓ ← → Enter Tab Esc Ctrl+C buttons for terminal interaction
+- Fix: inflight request timeout — requests without response older than 5 minutes no longer shown as in-flight
+- UI: remove guide icon from empty state in raw view mode
+- UI: add star request text in footer with i18n support
+
 ## 1.4.2 (2026-03-02)
 
 - Fix: prevent redundant cc-viewer server startup when Claude Code is launched via `ccv --c` or `ccv run` proxy mode (CCV_PROXY_MODE env guard)
+- Fix: read `ANTHROPIC_BASE_URL` from project-level config files (`.claude/settings.local.json`, `.claude/settings.json`) with correct priority order (#13)
 
 ## 1.4.1 (2026-03-02)
 

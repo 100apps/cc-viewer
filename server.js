@@ -1,8 +1,10 @@
 import { createServer } from 'node:http';
+import { createConnection } from 'node:net';
+import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync, watchFile, unwatchFile, statSync, readdirSync, renameSync, unlinkSync, openSync, readSync, closeSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname } from 'node:path';
-import { homedir, userInfo, platform } from 'node:os';
+import { homedir, userInfo, platform, networkInterfaces } from 'node:os';
 import { execSync } from 'node:child_process';
 import { Worker } from 'node:worker_threads';
 import { LOG_FILE, _initPromise, _resumeState, resolveResumeChoice, _projectName, _logDir, _cachedApiKey, _cachedAuthHeader, _cachedHaikuModel } from './interceptor.js';
@@ -46,7 +48,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const START_PORT = 7008;
 const MAX_PORT = 7099;
-const HOST = '127.0.0.1';
+const HOST = '0.0.0.0';
+
+// 局域网访问 token（本地 127.0.0.1 免验证）
+const ACCESS_TOKEN = randomBytes(16).toString('hex');
 
 let clients = [];
 let server;
@@ -180,7 +185,14 @@ function startWatching() {
 }
 
 function handleRequest(req, res) {
-  const { url, method } = req;
+  const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+  const url = parsedUrl.pathname;
+  const method = req.method;
+
+  // WebSocket 路径不处理，交给 upgrade 事件
+  if (url === '/ws/terminal') {
+    return;
+  }
 
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -191,6 +203,19 @@ function handleRequest(req, res) {
     res.writeHead(200);
     res.end();
     return;
+  }
+
+  // 局域网访问 token 验证（本地 127.0.0.1 / ::1 免验证，静态资源免验证）
+  const remoteIp = req.socket.remoteAddress;
+  const isLocal = remoteIp === '127.0.0.1' || remoteIp === '::1' || remoteIp === '::ffff:127.0.0.1';
+  const isStaticAsset = url.startsWith('/assets/') || url === '/favicon.ico';
+  if (!isLocal && !isStaticAsset) {
+    const urlToken = parsedUrl.searchParams.get('token');
+    if (urlToken !== ACCESS_TOKEN) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Forbidden: invalid token' }));
+      return;
+    }
   }
 
   // User preferences API
@@ -505,6 +530,24 @@ function handleRequest(req, res) {
     return;
   }
 
+  // 返回局域网访问地址
+  if (url === '/api/local-url' && method === 'GET') {
+    const nets = networkInterfaces();
+    let localIp = '127.0.0.1';
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name]) {
+        if (net.family === 'IPv4' && !net.internal) {
+          localIp = net.address;
+          break;
+        }
+      }
+      if (localIp !== '127.0.0.1') break;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ url: `http://${localIp}:${actualPort}?token=${ACCESS_TOKEN}` }));
+    return;
+  }
+
   // 列出本地日志文件（按项目分组，遍历项目子目录）
   if (url === '/api/local-logs' && method === 'GET') {
     try {
@@ -701,38 +744,48 @@ export async function startViewer() {
         return;
       }
 
-      const currentServer = createServer(handleRequest);
-
-      currentServer.listen(port, HOST, () => {
-        server = currentServer;
-        actualPort = port;
-        const url = `http://${HOST}:${port}`;
-        console.error(t('server.started', { host: HOST, port }));
-        // v2.0.69 之前的版本会清空控制台，自动打开浏览器确保用户能看到界面
-        try {
-          const ccPkgPath = join(__dirname, '..', '@anthropic-ai', 'claude-code', 'package.json');
-          const ccVer = JSON.parse(readFileSync(ccPkgPath, 'utf-8')).version;
-          const [maj, min, pat] = ccVer.split('.').map(Number);
-          if (maj < 2 || (maj === 2 && min === 0 && pat < 69)) {
-            const cmd = platform() === 'darwin' ? 'open' : platform() === 'win32' ? 'start' : 'xdg-open';
-            execSync(`${cmd} ${url}`, { stdio: 'ignore', timeout: 5000 });
-          }
-        } catch { }
-        startWatching();
-        startStatsWorker();
-        // CLI 模式下启动 WebSocket 服务
-        if (isCliMode) {
-          setupTerminalWebSocket(currentServer);
-        }
-        resolve(server);
+      // 先检测 127.0.0.1:port 是否已被占用（避免 0.0.0.0 和 127.0.0.1 绑定不冲突的问题）
+      const probe = createConnection({ host: '127.0.0.1', port });
+      probe.on('connect', () => {
+        probe.destroy();
+        tryListen(port + 1); // 端口已被占用，尝试下一个
       });
+      probe.on('error', () => {
+        probe.destroy();
+        // 端口空闲，绑定 0.0.0.0
+        const currentServer = createServer(handleRequest);
 
-      currentServer.on('error', (err) => {
-        if (err.code === 'EADDRINUSE') {
-          tryListen(port + 1);
-        } else {
-          reject(err);
-        }
+        currentServer.listen(port, HOST, () => {
+          server = currentServer;
+          actualPort = port;
+          const url = `http://${HOST}:${port}`;
+          console.error(t('server.started', { host: HOST, port }));
+          // v2.0.69 之前的版本会清空控制台，自动打开浏览器确保用户能看到界面
+          try {
+            const ccPkgPath = join(__dirname, '..', '@anthropic-ai', 'claude-code', 'package.json');
+            const ccVer = JSON.parse(readFileSync(ccPkgPath, 'utf-8')).version;
+            const [maj, min, pat] = ccVer.split('.').map(Number);
+            if (maj < 2 || (maj === 2 && min === 0 && pat < 69)) {
+              const cmd = platform() === 'darwin' ? 'open' : platform() === 'win32' ? 'start' : 'xdg-open';
+              execSync(`${cmd} ${url}`, { stdio: 'ignore', timeout: 5000 });
+            }
+          } catch { }
+          startWatching();
+          startStatsWorker();
+          // CLI 模式下启动 WebSocket 服务
+          if (isCliMode) {
+            setupTerminalWebSocket(currentServer);
+          }
+          resolve(server);
+        });
+
+        currentServer.on('error', (err) => {
+          if (err.code === 'EADDRINUSE') {
+            tryListen(port + 1);
+          } else {
+            reject(err);
+          }
+        });
       });
     }
 
@@ -745,7 +798,18 @@ async function setupTerminalWebSocket(httpServer) {
     const { WebSocketServer } = await import('ws');
     const { writeToPty, resizePty, onPtyData, onPtyExit, getPtyState, getOutputBuffer } = await import('./pty-manager.js');
 
-    const wss = new WebSocketServer({ server: httpServer, path: '/ws/terminal' });
+    const wss = new WebSocketServer({ noServer: true });
+
+    httpServer.on('upgrade', (req, socket, head) => {
+      const pathname = new URL(req.url, `http://${req.headers.host}`).pathname;
+      if (pathname === '/ws/terminal') {
+        wss.handleUpgrade(req, socket, head, (ws) => {
+          wss.emit('connection', ws, req);
+        });
+      } else {
+        socket.destroy();
+      }
+    });
 
     wss.on('connection', (ws) => {
       // 发送当前 PTY 状态
