@@ -401,15 +401,6 @@ class DetailPanel extends React.Component {
 
     const tabItems = [
       {
-        key: 'context',
-        label: 'Context',
-        children: (
-          <div className={styles.tabContent} style={{ height: 'calc(100vh - 220px)', minHeight: 400 }}>
-            <ContextTab body={request.body} response={request.response?.body} />
-          </div>
-        ),
-      },
-      {
         key: 'request',
         label: 'Request',
         children: (
@@ -505,6 +496,15 @@ class DetailPanel extends React.Component {
             ) : (
               <Empty description={t('ui.responseNotCaptured')} />
             )}
+          </div>
+        ),
+      },
+      {
+        key: 'context',
+        label: 'Context',
+        children: (
+          <div className={styles.tabContent} style={{ height: 'calc(100vh - 220px)', minHeight: 400 }}>
+            <ContextTab body={request.body} response={request.response?.body} />
           </div>
         ),
       },
