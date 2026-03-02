@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.2 (2026-03-02)
+
+- Fix: prevent redundant cc-viewer server startup when Claude Code is launched via `ccv --c` or `ccv run` proxy mode (CCV_PROXY_MODE env guard)
+
 ## 1.4.1 (2026-03-02)
 
 - Feat: Context Tab v2 — merged from PR #11, turn-based conversation view with collapsible history turns and current turn auto-selection

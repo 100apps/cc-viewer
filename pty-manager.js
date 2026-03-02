@@ -41,6 +41,7 @@ export async function spawnClaude(proxyPort, cwd) {
 
   const env = { ...process.env };
   env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${proxyPort}`;
+  env.CCV_PROXY_MODE = '1'; // 告诉 interceptor.js 不要再启动 server
 
   const settingsJson = JSON.stringify({
     env: { ANTHROPIC_BASE_URL: env.ANTHROPIC_BASE_URL }

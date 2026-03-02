@@ -173,6 +173,7 @@ async function runProxyCommand(args) {
       }
     }
     env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${proxyPort}`;
+    env.CCV_PROXY_MODE = '1'; // 告诉 interceptor.js 不要再启动 server
 
     const settingsJson = JSON.stringify({
       env: {
