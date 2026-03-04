@@ -94,6 +94,33 @@ export function startProxy() {
           }
         }
 
+        // 如果是错误响应，尝试解析并打印具体的错误信息
+        if (!response.ok) {
+          try {
+            const errorText = await response.text();
+            try {
+              const errorJson = JSON.parse(errorText);
+              // 提取 Anthropic 格式的错误信息
+              if (errorJson.error && errorJson.error.message) {
+                console.error(`[CC-Viewer Proxy] API Error: ${errorJson.error.message}`);
+              } else if (errorJson.message) {
+                console.error(`[CC-Viewer Proxy] API Error: ${errorJson.message}`);
+              } else {
+                console.error(`[CC-Viewer Proxy] API Error (${response.status}): ${errorText.slice(0, 200)}`);
+              }
+            } catch {
+              console.error(`[CC-Viewer Proxy] API Error (${response.status}): ${errorText.slice(0, 200)}`);
+            }
+
+            res.writeHead(response.status, responseHeaders);
+            res.end(errorText);
+            return;
+          } catch (err) {
+            // 读取 body 失败，回退到流式处理
+            console.error('[CC-Viewer Proxy] Failed to read error body:', err);
+          }
+        }
+
         res.writeHead(response.status, responseHeaders);
 
         if (response.body) {
@@ -105,7 +132,20 @@ export function startProxy() {
           res.end();
         }
       } catch (err) {
-        console.error('[CC-Viewer Proxy] Error:', err);
+        // Log concise error unless debugging
+        if (process.env.CCV_DEBUG) {
+          console.error('[CC-Viewer Proxy] Error:', err);
+        } else {
+          // Format concise error message
+          let msg = err.message;
+          if (err.cause) msg += ` (${err.cause.message || err.cause.code || err.cause})`;
+          // Shorten common timeout errors
+          if (msg.includes('HEADERS_TIMEOUT')) msg = 'Upstream headers timeout';
+          if (msg.includes('BODY_TIMEOUT')) msg = 'Upstream body timeout';
+
+          console.error(`[CC-Viewer Proxy] Request failed: ${msg}`);
+        }
+
         res.statusCode = 502;
         res.end('Proxy Error');
       }
