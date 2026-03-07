@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { execFileSync } from 'node:child_process';
@@ -8,9 +8,13 @@ import { checkAndUpdate } from '../lib/updater.js';
 
 const CACHE_DIR = join(homedir(), '.claude', 'cc-viewer');
 const CACHE_FILE = join(CACHE_DIR, 'update-check.json');
+const CC_SETTINGS_FILE = join(homedir(), '.claude', 'settings.json');
 
 // Save/restore helpers for cache file
 let savedCache = null;
+// Save/restore helpers for settings file
+let savedSettings = null;
+let settingsExisted = false;
 
 function backupCache() {
   try {
@@ -27,6 +31,40 @@ function restoreCache() {
     }
   } catch {}
   savedCache = null;
+}
+
+function backupSettings() {
+  try {
+    settingsExisted = existsSync(CC_SETTINGS_FILE);
+    if (settingsExisted) {
+      savedSettings = readFileSync(CC_SETTINGS_FILE, 'utf-8');
+    }
+  } catch {}
+}
+
+function restoreSettings() {
+  try {
+    if (settingsExisted && savedSettings !== null) {
+      writeFileSync(CC_SETTINGS_FILE, savedSettings);
+    } else if (!settingsExisted && existsSync(CC_SETTINGS_FILE)) {
+      unlinkSync(CC_SETTINGS_FILE);
+    }
+  } catch {}
+  savedSettings = null;
+  settingsExisted = false;
+}
+
+// Write a settings file that enables auto-updates (removes the blocker)
+function enableAutoUpdates() {
+  try {
+    let settings = {};
+    if (existsSync(CC_SETTINGS_FILE)) {
+      settings = JSON.parse(readFileSync(CC_SETTINGS_FILE, 'utf-8'));
+    }
+    delete settings.autoUpdates;
+    mkdirSync(join(homedir(), '.claude'), { recursive: true });
+    writeFileSync(CC_SETTINGS_FILE, JSON.stringify(settings, null, 2));
+  } catch {}
 }
 
 // ─── checkAndUpdate: disabled via env ───
@@ -55,6 +93,36 @@ describe('checkAndUpdate — disabled', () => {
   });
 });
 
+// ─── checkAndUpdate: disabled via settings file ───
+
+describe('checkAndUpdate — disabled via settings', () => {
+  let origEnv;
+
+  beforeEach(() => {
+    origEnv = process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC;
+    delete process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC;
+    backupSettings();
+  });
+
+  afterEach(() => {
+    restoreSettings();
+    if (origEnv === undefined) {
+      delete process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC;
+    } else {
+      process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = origEnv;
+    }
+  });
+
+  it('returns disabled when settings.json has autoUpdates: false', async () => {
+    mkdirSync(join(homedir(), '.claude'), { recursive: true });
+    writeFileSync(CC_SETTINGS_FILE, JSON.stringify({ autoUpdates: false }));
+    const result = await checkAndUpdate();
+    assert.equal(result.status, 'disabled');
+    assert.equal(result.remoteVersion, null);
+    assert.ok(result.currentVersion);
+  });
+});
+
 // ─── checkAndUpdate: skipped via recent cache ───
 
 describe('checkAndUpdate — skipped', () => {
@@ -63,11 +131,14 @@ describe('checkAndUpdate — skipped', () => {
   beforeEach(() => {
     origEnv = process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC;
     delete process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC;
+    backupSettings();
+    enableAutoUpdates();
     backupCache();
   });
 
   afterEach(() => {
     restoreCache();
+    restoreSettings();
     if (origEnv === undefined) {
       delete process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC;
     } else {
@@ -92,11 +163,14 @@ describe('checkAndUpdate — fetch', () => {
   beforeEach(() => {
     origEnv = process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC;
     delete process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC;
+    backupSettings();
+    enableAutoUpdates();
     backupCache();
   });
 
   afterEach(() => {
     restoreCache();
+    restoreSettings();
     if (origEnv === undefined) {
       delete process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC;
     } else {

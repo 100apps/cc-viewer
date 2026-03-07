@@ -521,6 +521,14 @@ async function handleRequest(req, res) {
           } catch {}
         });
 
+        // 发送 full_reload 以刷新会话区域
+        const entries = readLogFile();
+        clients.forEach(client => {
+          try {
+            client.write(`event: full_reload\ndata: ${JSON.stringify(entries)}\n\n`);
+          } catch {}
+        });
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, projectName: result.projectName }));
       } catch (err) {

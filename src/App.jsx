@@ -134,6 +134,10 @@ class App extends React.Component {
   }
 
   animateLoadingCount(target, onDone) {
+    if (this._loadingCountTimer) {
+      cancelAnimationFrame(this._loadingCountTimer);
+      this._loadingCountTimer = null;
+    }
     const duration = Math.min(800, Math.max(300, target * 0.5));
     const start = performance.now();
     const step = (now) => {
@@ -213,11 +217,19 @@ class App extends React.Component {
       this.eventSource.addEventListener('workspace_started', (event) => {
         try {
           const data = JSON.parse(event.data);
+          // 取消旧动画，防止旧 full_reload 回调覆盖新数据
+          if (this._loadingCountTimer) {
+            cancelAnimationFrame(this._loadingCountTimer);
+            this._loadingCountTimer = null;
+          }
           this.setState({
             workspaceMode: false,
             projectName: data.projectName || '',
             viewMode: 'chat',
             cliMode: true,
+            requests: [],
+            mainAgentSessions: [],
+            selectedIndex: null,
           });
         } catch {}
       });
@@ -490,7 +502,9 @@ class App extends React.Component {
     });
   };
 
-  handleWorkspaceLaunch = ({ projectName, path }) => {
+  handleWorkspaceLaunch = ({ projectName }) => {
+    this._isLocalLog = false;
+    this._localLogFile = null;
     this.setState({
       workspaceMode: false,
       projectName,

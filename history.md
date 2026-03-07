@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.29 (2026-03-07)
+
+- Fix: conversation area not refreshing after workspace switch due to race condition between SSE full_reload animation and HTTP response callback
+- Fix: send full_reload SSE event after workspace launch so client receives the new workspace's log data
+- Fix: cancel stale animateLoadingCount timer on workspace switch to prevent old callback from overwriting new data
+- Fix: updater tests failing when ~/.claude/settings.json has autoUpdates disabled — now mock settings file in tests
+- Test: add test case for settings.json-based auto-update disabling
+
 ## 1.4.28 (2026-03-06)
 
 - Feat: move "Workspaces" button from header bar into dropdown menu as "Switch Workspace", shown only in CLI mode
