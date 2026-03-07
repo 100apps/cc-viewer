@@ -53,7 +53,7 @@ function buildTree(changes) {
   return root;
 }
 
-function TreeDir({ name, node, depth, onFileClick }) {
+function TreeDir({ name, node, depth, onFileClick, selectedFile }) {
   const dirNames = Object.keys(node.dirs).sort();
   const files = [...node.files].sort((a, b) => a.name.localeCompare(b.name));
   return (
@@ -70,12 +70,12 @@ function TreeDir({ name, node, depth, onFileClick }) {
         </div>
       )}
       {dirNames.map(dir => (
-        <TreeDir key={dir} name={dir} node={node.dirs[dir]} depth={name ? depth + 1 : depth} onFileClick={onFileClick} />
+        <TreeDir key={dir} name={dir} node={node.dirs[dir]} depth={name ? depth + 1 : depth} onFileClick={onFileClick} selectedFile={selectedFile} />
       ))}
       {files.map(file => (
         <div
           key={file.fullPath}
-          className={styles.changeItem}
+          className={`${styles.changeItem} ${selectedFile === file.fullPath ? styles.changeItemSelected : ''}`}
           style={{ paddingLeft: 8 + (name ? depth + 1 : depth) * 16 }}
           onClick={() => onFileClick && onFileClick(file.fullPath)}
         >
@@ -94,6 +94,7 @@ export default function GitChanges({ onClose, onFileClick }) {
   const [changes, setChanges] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedFile, setSelectedFile] = useState(null);
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -134,7 +135,10 @@ export default function GitChanges({ onClose, onFileClick }) {
           <div className={styles.empty}>No changes</div>
         )}
         {!loading && !error && changes && changes.length > 0 && (
-          <TreeDir name="" node={buildTree(changes)} depth={0} onFileClick={onFileClick} />
+          <TreeDir name="" node={buildTree(changes)} depth={0} onFileClick={(filePath) => {
+            setSelectedFile(filePath);
+            onFileClick && onFileClick(filePath);
+          }} selectedFile={selectedFile} />
         )}
       </div>
     </div>

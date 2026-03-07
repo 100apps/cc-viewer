@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.32 (2026-03-07)
+
+- Feat: git changes file list now highlights the selected file, matching file explorer's hover and selected state style
+
 ## 1.4.31 (2026-03-07)
 
 - Feat: FullFileDiffView unified diff — dual line numbers (old | new), deleted lines shown inline with strikethrough instead of tooltip

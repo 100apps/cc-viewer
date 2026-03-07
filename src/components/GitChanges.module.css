@@ -68,6 +68,10 @@
   background: #1a1a1a;
 }
 
+.changeItemSelected {
+  background: #1a1a1a;
+}
+
 .dirItem {
   display: flex;
   align-items: center;
