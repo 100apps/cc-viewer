@@ -930,7 +930,7 @@ class AppHeader extends React.Component {
               <strong className={styles.countdownStrong}>{countdownText}</strong>
             </Tag>
           )}
-          {viewMode === 'chat' && cliMode && this.state.localUrl && (
+          {viewMode === 'chat' && cliMode && !isLocalLog && this.state.localUrl && (
             <Popover
               content={
                 <div className={styles.qrcodePopover}>

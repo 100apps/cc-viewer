@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.6 (2026-03-09)
+
+- Fix: hide QR code entry in history log mode on PC
+- Fix: DiffView toggle button (expand/collapse) no longer wraps on narrow screens
+- Improve: DiffView code area supports unified horizontal scrolling — line numbers and +/- prefix columns use `position: sticky` with opaque backgrounds to stay fixed while code scrolls
+
 ## 1.5.5 (2026-03-09)
 
 - Feat: download log file — new download button per log entry, streams raw JSONL via `/api/download-log`

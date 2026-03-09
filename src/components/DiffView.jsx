@@ -82,12 +82,8 @@ function DiffView({ file_path, old_string, new_string, startLine = 1 }) {
                 const prefix = dl.type === 'del' ? '-' : dl.type === 'add' ? '+' : ' ';
                 return (
                   <tr key={i} className={rowClass}>
-                    <td className={styles.lineNumOld}>
-                      {dl.oldNum ?? ''}
-                    </td>
-                    <td className={styles.lineNumNew}>
-                      {dl.newNum ?? ''}
-                    </td>
+                    <td className={styles.lineNumOld}>{dl.oldNum ?? ''}</td>
+                    <td className={styles.lineNumNew}>{dl.newNum ?? ''}</td>
                     <td className={styles.prefix}>{prefix}</td>
                     <td className={styles.lineContent}>{dl.text}</td>
                   </tr>
