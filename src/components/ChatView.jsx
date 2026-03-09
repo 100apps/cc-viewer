@@ -9,12 +9,15 @@ import GitDiffView from './GitDiffView';
 import { extractToolResultText, getModelInfo } from '../utils/helpers';
 import { isSystemText, classifyUserContent, isMainAgent } from '../utils/contentFilter';
 import { classifyRequest, formatRequestTag } from '../utils/requestType';
+import { isMobile } from '../env';
 import { t } from '../i18n';
 import styles from './ChatView.module.css';
 
 const { Text } = Typography;
 
 const QUEUE_THRESHOLD = 20;
+const MOBILE_ITEM_LIMIT = 300;
+const MOBILE_LOAD_MORE_STEP = 100;
 
 function randomInterval() {
   return 100 + Math.random() * 50;
@@ -190,6 +193,9 @@ class ChatView extends React.Component {
     this._inputRef = React.createRef();
     this._ptyBuffer = '';
     this._ptyDebounceTimer = null;
+    this._mobileExtraItems = 0;
+    this._mobileSliceOffset = 0;
+    this._totalItemCount = 0;
   }
 
   componentDidMount() {
@@ -208,19 +214,45 @@ class ChatView extends React.Component {
 
   componentDidUpdate(prevProps) {
     if (prevProps.mainAgentSessions !== this.props.mainAgentSessions) {
+      if (isMobile) this._mobileExtraItems = 0;
       this.startRender();
       if (this.state.pendingInput) {
         this.setState({ pendingInput: null });
       }
       this._updateSuggestion();
     } else if (prevProps.collapseToolResults !== this.props.collapseToolResults || prevProps.expandThinking !== this.props.expandThinking) {
-      const allItems = this.buildAllItems();
+      const rawItems = this.buildAllItems();
+      const allItems = this._applyMobileSlice(rawItems);
       this.setState({ allItems, visibleCount: allItems.length });
     }
     // scrollToTimestamp 变化时（如从 raw 模式切回 chat），重建 items 并滚动定位
     if (!prevProps.scrollToTimestamp && this.props.scrollToTimestamp) {
-      const allItems = this.buildAllItems();
-      this.setState({ allItems, visibleCount: allItems.length }, () => this.scrollToBottom());
+      // If target is in hidden area, expand to include it
+      if (isMobile && this.props.scrollToTimestamp) {
+        const rawItems = this.buildAllItems();
+        const targetIdx = this._scrollTargetIdx;
+        if (targetIdx != null) {
+          const limit = MOBILE_ITEM_LIMIT + this._mobileExtraItems;
+          const offset = rawItems.length > limit ? rawItems.length - limit : 0;
+          if (targetIdx < offset) {
+            this._mobileExtraItems = rawItems.length - targetIdx - MOBILE_ITEM_LIMIT;
+            if (this._mobileExtraItems < 0) this._mobileExtraItems = 0;
+          }
+        }
+        const allItems = this._applyMobileSlice(rawItems);
+        this.setState({ allItems, visibleCount: allItems.length }, () => this.scrollToBottom());
+      } else {
+        const rawItems = this.buildAllItems();
+        const allItems = this._applyMobileSlice(rawItems);
+        this.setState({ allItems, visibleCount: allItems.length }, () => this.scrollToBottom());
+      }
+    }
+    // mobileChatVisible: scroll to bottom when becoming visible
+    if (isMobile && this.props.mobileChatVisible && !prevProps.mobileChatVisible) {
+      requestAnimationFrame(() => {
+        const el = this.containerRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+      });
     }
     // cliMode 异步生效后建立 WebSocket 连接
     if (!prevProps.cliMode && this.props.cliMode) {
@@ -253,7 +285,8 @@ class ChatView extends React.Component {
   startRender() {
     if (this._queueTimer) clearTimeout(this._queueTimer);
 
-    const allItems = this.buildAllItems();
+    const rawItems = this.buildAllItems();
+    const allItems = this._applyMobileSlice(rawItems);
     const prevLen = this._prevItemsLen;
     this._prevItemsLen = allItems.length;
 
@@ -361,6 +394,21 @@ class ChatView extends React.Component {
     this.setState({ stickyBottom: true }, () => {
       const el = this.containerRef.current;
       if (el) el.scrollTop = el.scrollHeight;
+    });
+  };
+
+  handleLoadMore = () => {
+    this._mobileExtraItems += MOBILE_LOAD_MORE_STEP;
+    const el = this.containerRef.current;
+    const prevScrollHeight = el ? el.scrollHeight : 0;
+    const prevScrollTop = el ? el.scrollTop : 0;
+    const rawItems = this.buildAllItems();
+    const allItems = this._applyMobileSlice(rawItems);
+    this.setState({ allItems, visibleCount: allItems.length }, () => {
+      if (el) {
+        const newScrollHeight = el.scrollHeight;
+        el.scrollTop = prevScrollTop + (newScrollHeight - prevScrollHeight);
+      }
     });
   };
 
@@ -595,6 +643,37 @@ class ChatView extends React.Component {
     this._tsItemMap = tsItemMap;
 
     return allItems;
+  }
+
+  _applyMobileSlice(allItems) {
+    if (!isMobile) {
+      this._mobileSliceOffset = 0;
+      this._totalItemCount = allItems.length;
+      return allItems;
+    }
+    this._totalItemCount = allItems.length;
+    const limit = MOBILE_ITEM_LIMIT + this._mobileExtraItems;
+    if (allItems.length <= limit) {
+      this._mobileSliceOffset = 0;
+      return allItems;
+    }
+    const offset = allItems.length - limit;
+    this._mobileSliceOffset = offset;
+    // Adjust scroll target index
+    if (this._scrollTargetIdx != null) {
+      this._scrollTargetIdx -= offset;
+      if (this._scrollTargetIdx < 0) this._scrollTargetIdx = null;
+    }
+    // Adjust tsItemMap
+    if (this._tsItemMap) {
+      const newMap = {};
+      for (const [ts, idx] of Object.entries(this._tsItemMap)) {
+        const adjusted = idx - offset;
+        if (adjusted >= 0) newMap[ts] = adjusted;
+      }
+      this._tsItemMap = newMap;
+    }
+    return allItems.slice(offset);
   }
 
   _extractSuggestion() {
@@ -1108,6 +1187,14 @@ class ChatView extends React.Component {
       );
     }) : null;
 
+    const loadMoreBtn = isMobile && this._mobileSliceOffset > 0 ? (
+      <div className={styles.loadMoreWrap}>
+        <button className={styles.loadMoreBtn} onClick={this.handleLoadMore}>
+          {t('ui.loadMoreHistory', { count: this._mobileSliceOffset })}
+        </button>
+      </div>
+    ) : null;
+
     const messageList = (noData || loading) ? (
       <div className={styles.messageListWrap}>
         <div ref={this.containerRef} className={styles.container}>
@@ -1127,6 +1214,7 @@ class ChatView extends React.Component {
           ref={this.containerRef}
           className={styles.container}
         >
+          {loadMoreBtn}
           {visible.map((item, i) => {
             const isScrollTarget = i === targetIdx;
             const needsHighlight = i === highlightIdx;

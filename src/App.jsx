@@ -17,7 +17,7 @@ import { isMainAgent } from './utils/contentFilter';
 import { classifyRequest } from './utils/requestType';
 import styles from './App.module.css';
 import { apiUrl } from './utils/apiUrl';
-import { saveEntries, loadEntries, clearEntries } from './utils/entryCache';
+import { saveEntries, loadEntries, clearEntries, getCacheMeta } from './utils/entryCache';
 
 class App extends React.Component {
   constructor(props) {
@@ -117,7 +117,7 @@ class App extends React.Component {
                 requests: cached,
                 selectedIndex: filtered.length > 0 ? filtered.length - 1 : null,
                 mainAgentSessions,
-                // fileLoading 保持 true，等 SSE 最终数据到达后再关闭
+                fileLoading: false,
               });
             }
           });
@@ -183,9 +183,22 @@ class App extends React.Component {
   }
 
   initSSE() {
-    this.setState({ fileLoading: true, fileLoadingCount: 0 });
     try {
-      this.eventSource = new EventSource(apiUrl('/events'));
+      // 尝试使用缓存元数据进行增量加载
+      let url = '/events';
+      let hasCache = false;
+      if (isMobile) {
+        const meta = getCacheMeta();
+        if (meta && meta.lastTs && meta.count > 0) {
+          url = `/events?since=${encodeURIComponent(meta.lastTs)}&cc=${meta.count}`;
+          hasCache = true;
+        }
+      }
+      // 只有在无缓存时才显示 loading 遮罩
+      if (!hasCache) {
+        this.setState({ fileLoading: true, fileLoadingCount: 0 });
+      }
+      this.eventSource = new EventSource(apiUrl(url));
       this.eventSource.onmessage = (event) => this.handleEventMessage(event);
       this.eventSource.addEventListener('resume_prompt', (event) => {
         try {
@@ -213,7 +226,11 @@ class App extends React.Component {
           const data = JSON.parse(event.data);
           this._chunkedEntries = [];
           this._chunkedTotal = data.total || 0;
-          this.setState({ fileLoading: true, fileLoadingCount: 0 });
+          this._isIncremental = !!data.incremental;
+          // 增量模式下已有缓存数据在显示，不需要 loading 遮罩
+          if (!this._isIncremental) {
+            this.setState({ fileLoading: true, fileLoadingCount: 0 });
+          }
         } catch { }
       });
       this.eventSource.addEventListener('load_chunk', (event) => {
@@ -221,14 +238,25 @@ class App extends React.Component {
           const chunk = JSON.parse(event.data);
           if (Array.isArray(chunk)) {
             this._chunkedEntries.push(...chunk);
-            this.setState({ fileLoadingCount: this._chunkedEntries.length });
+            // 增量模式下静默累积，不更新 loading 计数
+            if (!this._isIncremental) {
+              this.setState({ fileLoadingCount: this._chunkedEntries.length });
+            }
           }
         } catch { }
       });
       this.eventSource.addEventListener('load_end', () => {
-        const entries = this._chunkedEntries;
+        const delta = this._chunkedEntries;
         this._chunkedEntries = [];
         this._chunkedTotal = 0;
+        const isIncremental = this._isIncremental;
+        this._isIncremental = false;
+
+        // 增量模式：将增量数据拼接到已有缓存后面
+        const entries = (isIncremental && isMobile && this.state.requests.length > 0)
+          ? [...this.state.requests, ...delta]
+          : delta;
+
         if (Array.isArray(entries) && entries.length > 0) {
           this.assignMessageTimestamps(entries);
           const mainAgentSessions = this.buildSessionsFromEntries(entries);
@@ -1141,6 +1169,7 @@ class App extends React.Component {
                     onScrollTsDone={() => {}}
                     cliMode={false}
                     terminalVisible={false}
+                    mobileChatVisible={this.state.mobileChatVisible}
                   />
                 </div>
               </ConfigProvider>

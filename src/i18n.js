@@ -2982,6 +2982,26 @@ const i18nData = {
     "ar": "اذهب", "no": "Gå", "pt-BR": "Ir",
     "th": "ไป", "tr": "Git", "uk": "Перейти"
   },
+  "ui.loadMoreHistory": {
+    "zh": "加载更早的消息（隐藏 {count} 条）",
+    "en": "Load earlier messages ({count} hidden)",
+    "zh-TW": "載入更早的訊息（隱藏 {count} 條）",
+    "ko": "이전 메시지 로드 ({count}개 숨겨짐)",
+    "ja": "以前のメッセージを読み込む（{count}件非表示）",
+    "de": "Ältere Nachrichten laden ({count} ausgeblendet)",
+    "es": "Cargar mensajes anteriores ({count} ocultos)",
+    "fr": "Charger les messages précédents ({count} masqués)",
+    "it": "Carica messaggi precedenti ({count} nascosti)",
+    "da": "Indlæs ældre beskeder ({count} skjulte)",
+    "pl": "Załaduj wcześniejsze wiadomości ({count} ukrytych)",
+    "ru": "Загрузить ранние сообщения ({count} скрыто)",
+    "ar": "تحميل رسائل أقدم ({count} مخفية)",
+    "no": "Last inn eldre meldinger ({count} skjulte)",
+    "pt-BR": "Carregar mensagens anteriores ({count} ocultas)",
+    "th": "โหลดข้อความเก่า ({count} ถูกซ่อน)",
+    "tr": "Eski mesajları yükle ({count} gizli)",
+    "uk": "Завантажити старіші повідомлення ({count} приховано)"
+  },
   "ui.workspaces.emptyDir": {
     "zh": "此目录下没有子目录", "en": "No subdirectories in this directory", "zh-TW": "此目錄下沒有子目錄",
     "ko": "이 디렉토리에 하위 디렉토리가 없습니다", "ja": "このディレクトリにはサブディレクトリがありません",
