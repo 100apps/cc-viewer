@@ -4,6 +4,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { setupInterceptor } from './interceptor.js';
+import { extractApiErrorMessage, formatProxyRequestError } from './proxy-errors.js';
 
 // Setup interceptor to patch fetch
 setupInterceptor();
@@ -98,19 +99,7 @@ export function startProxy() {
         if (!response.ok) {
           try {
             const errorText = await response.text();
-            try {
-              const errorJson = JSON.parse(errorText);
-              // 提取 Anthropic 格式的错误信息
-              if (errorJson.error && errorJson.error.message) {
-                console.error(`[CC-Viewer Proxy] API Error: ${errorJson.error.message}`);
-              } else if (errorJson.message) {
-                console.error(`[CC-Viewer Proxy] API Error: ${errorJson.message}`);
-              } else {
-                console.error(`[CC-Viewer Proxy] API Error (${response.status}): ${errorText.slice(0, 200)}`);
-              }
-            } catch {
-              console.error(`[CC-Viewer Proxy] API Error (${response.status}): ${errorText.slice(0, 200)}`);
-            }
+            console.error(`[CC-Viewer Proxy] ${extractApiErrorMessage(response.status, errorText)}`);
 
             res.writeHead(response.status, responseHeaders);
             res.end(errorText);
@@ -136,14 +125,7 @@ export function startProxy() {
         if (process.env.CCV_DEBUG) {
           console.error('[CC-Viewer Proxy] Error:', err);
         } else {
-          // Format concise error message
-          let msg = err.message;
-          if (err.cause) msg += ` (${err.cause.message || err.cause.code || err.cause})`;
-          // Shorten common timeout errors
-          if (msg.includes('HEADERS_TIMEOUT')) msg = 'Upstream headers timeout';
-          if (msg.includes('BODY_TIMEOUT')) msg = 'Upstream body timeout';
-
-          console.error(`[CC-Viewer Proxy] Request failed: ${msg}`);
+          console.error(formatProxyRequestError(err));
         }
 
         res.statusCode = 502;
