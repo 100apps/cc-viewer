@@ -68,14 +68,52 @@ export default {
 
 | Hook 名称 | 类型 | 参数 | 返回值 | 触发时机 |
 |-----------|------|------|--------|---------|
+| `httpsOptions` | waterfall | `{}` | `{ pfx, passphrase }` 或 `{ cert, key }` | 服务器创建前 |
 | `localUrl` | waterfall | `{ url, ip, port, token }` | `{ url }` | 客户端请求局域网地址时 |
-| `serverStarted` | parallel | `{ port, host }` | 忽略 | 服务器启动成功后 |
+| `serverStarted` | parallel | `{ port, host, url, ip, token, protocol }` | 忽略 | 服务器启动成功后 |
 | `serverStopping` | parallel | `{}` | 忽略 | 服务器关闭前 |
 | `onNewEntry` | parallel | `entry` (JSONL 日志条目对象) | 忽略 | 检测到新的 JSONL 日志条目时 |
 
 ---
 
 ## Hook 详解
+
+### `httpsOptions` — 提供 HTTPS 证书
+
+**类型：Waterfall（串行管道）**
+
+服务器启动时触发，用于获取 HTTPS 证书选项。如果返回的对象包含 `pfx` 或 `cert`，服务器将以 HTTPS 模式启动；否则回退到 HTTP。
+
+**参数说明：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| （空对象） | `object` | 初始空对象，插件可以向其中添加 TLS 选项 |
+
+**返回值：** 返回 `{ pfx, passphrase }` 或 `{ cert, key }`，传给 `https.createServer()`。
+
+```javascript
+hooks: {
+  async httpsOptions() {
+    // 示例 1：从内网包加载 PFX 证书
+    const { getDevPfxBuffer, getDevPassphrase } = await import('@al/xxx');
+    return { pfx: await getDevPfxBuffer(), passphrase: await getDevPassphrase() };
+  },
+}
+```
+
+```javascript
+hooks: {
+  async httpsOptions() {
+    // 示例 2：从文件加载 PEM 证书
+    const { readFileSync } = await import('node:fs');
+    return {
+      cert: readFileSync('/path/to/cert.pem'),
+      key: readFileSync('/path/to/key.pem'),
+    };
+  },
+}
+```
 
 ### `localUrl` — 修改局域网访问地址
 
@@ -130,14 +168,14 @@ hooks: {
 
 ```javascript
 hooks: {
-  async serverStarted({ port, host }) {
-    console.error(`[my-plugin] 服务器运行在 ${host}:${port}`);
+  async serverStarted({ port, host, url, ip, token, protocol }) {
+    console.error(`[my-plugin] 服务器运行在 ${url}`);
 
     // 示例：通知企业监控系统
     fetch('https://monitor.company.com/api/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ service: 'cc-viewer', port, host }),
+      body: JSON.stringify({ service: 'cc-viewer', port, host, url }),
     }).catch(() => {});
   },
 }

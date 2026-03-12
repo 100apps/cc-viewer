@@ -61,6 +61,40 @@ export default {
 
 ## Available Hooks
 
+### `httpsOptions` — Waterfall
+
+Triggered at server startup to obtain HTTPS certificate options. If the returned object contains `pfx` or `cert`, the server starts in HTTPS mode; otherwise it falls back to HTTP.
+
+| Property | Description |
+|----------|-------------|
+| **Type** | Waterfall (serial pipeline) |
+| **Parameters** | `{}` (empty object) |
+| **Returns** | `{ pfx, passphrase }` or `{ cert, key }` — TLS options passed to `https.createServer()` |
+| **Timing** | Before the HTTP/HTTPS server is created |
+
+```javascript
+hooks: {
+  async httpsOptions() {
+    // Example: load PFX certificate from an internal package
+    const { getDevPfxBuffer, getDevPassphrase } = await import('@al/xxx');
+    return { pfx: await getDevPfxBuffer(), passphrase: await getDevPassphrase() };
+  },
+}
+```
+
+```javascript
+hooks: {
+  async httpsOptions() {
+    // Example: load PEM cert/key from files
+    const { readFileSync } = await import('node:fs');
+    return {
+      cert: readFileSync('/path/to/cert.pem'),
+      key: readFileSync('/path/to/key.pem'),
+    };
+  },
+}
+```
+
 ### `localUrl` — Waterfall
 
 Triggered when `/api/local-url` is requested (used by the QR code feature).
@@ -88,14 +122,14 @@ Triggered after the HTTP server starts successfully.
 | Property | Description |
 |----------|-------------|
 | **Type** | Parallel (concurrent notification) |
-| **Parameters** | `{ port, host }` |
+| **Parameters** | `{ port, host, url, ip, token, protocol }` |
 | **Returns** | Ignored |
 | **Timing** | After server binds to a port |
 
 ```javascript
 hooks: {
-  async serverStarted({ port, host }) {
-    console.error(`[my-plugin] Server is running on ${host}:${port}`);
+  async serverStarted({ port, host, url, ip, token, protocol }) {
+    console.error(`[my-plugin] Server is running at ${url}`);
   },
 }
 ```

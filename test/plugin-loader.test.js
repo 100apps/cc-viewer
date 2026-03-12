@@ -264,6 +264,73 @@ describe('runWaterfallHook', () => {
   });
 });
 
+// ─── httpsOptions hook ───
+
+describe('httpsOptions waterfall hook', () => {
+  beforeEach(() => {
+    mkdirSync(PLUGINS_DIR, { recursive: true });
+  });
+  afterEach(async () => {
+    cleanup();
+    await loadPlugins();
+  });
+
+  it('returns object when no test plugins provide https options', async () => {
+    await loadPlugins();
+    const result = await runWaterfallHook('httpsOptions', {});
+    assert.ok(typeof result === 'object' && result !== null, 'should return an object');
+  });
+
+  it('returns pfx-based https options from plugin', async () => {
+    writePlugin('test-https-pfx.js', `
+      export default {
+        name: 'https-pfx',
+        hooks: {
+          async httpsOptions() {
+            return { pfx: Buffer.from('fake-pfx'), passphrase: 'test' };
+          }
+        }
+      };
+    `);
+    await loadPlugins();
+    const result = await runWaterfallHook('httpsOptions', {});
+    assert.ok(result.pfx, 'should have pfx');
+    assert.equal(result.passphrase, 'test');
+  });
+
+  it('returns cert-based https options from plugin', async () => {
+    writePlugin('test-https-cert.js', `
+      export default {
+        name: 'https-cert',
+        hooks: {
+          async httpsOptions() {
+            return { cert: 'fake-cert', key: 'fake-key' };
+          }
+        }
+      };
+    `);
+    await loadPlugins();
+    const result = await runWaterfallHook('httpsOptions', {});
+    assert.equal(result.cert, 'fake-cert');
+    assert.equal(result.key, 'fake-key');
+  });
+
+  it('continues on plugin error and returns initial value', async () => {
+    writePlugin('test-https-err.js', `
+      export default {
+        name: 'https-err',
+        hooks: {
+          async httpsOptions() { throw new Error('cert load failed'); }
+        }
+      };
+    `);
+    await loadPlugins();
+    const result = await runWaterfallHook('httpsOptions', {});
+    // 插件抛错时 waterfall 应跳过该插件继续执行，不应抛出异常
+    assert.ok(typeof result === 'object', 'should return an object');
+  });
+});
+
 // ─── runParallelHook ───
 
 describe('runParallelHook', () => {

@@ -67,9 +67,16 @@ describe('server API endpoints', { concurrency: false }, () => {
     assert.ok(port > 0, 'port should be assigned');
   });
 
-  after(() => {
-    stopViewer();
-    rmSync(tmpDir, { recursive: true, force: true });
+  after(async () => {
+    // Wait for server to fully close to avoid EPIPE from lingering async activity
+    await new Promise((resolve) => {
+      stopViewer();
+      // Give server.close() time to finish pending connections
+      setTimeout(() => {
+        rmSync(tmpDir, { recursive: true, force: true });
+        resolve();
+      }, 200);
+    });
   });
 
   // --- CORS ---
@@ -262,6 +269,11 @@ describe('server API endpoints', { concurrency: false }, () => {
     } else {
       assert.equal(spaRes.status, 404);
     }
+  // --- Unknown route falls through to SPA fallback ---
+  it('GET /api/nonexistent falls through to SPA fallback', async () => {
+    const res = await httpRequest(port, '/api/nonexistent');
+    // SPA fallback serves index.html (200) when dist exists, 404 otherwise (e.g. CI)
+    assert.ok([200, 404].includes(res.status));
   });
 
   // --- IGNORED_PATTERNS in /api/files ---

@@ -299,12 +299,13 @@ async function runCliMode(extraClaudeArgs = [], cwd) {
     await spawnClaude(proxyPort, workingDir, extraClaudeArgs, claudePath, isNpmVersion, port);
   } catch (err) {
     console.error('[CC Viewer] Failed to spawn Claude:', err.message);
-    serverMod.stopViewer();
+    await serverMod.stopViewer();
     process.exit(1);
   }
 
   // 4. 自动打开浏览器
-  const url = `http://127.0.0.1:${port}`;
+  const protocol = serverMod.getProtocol();
+  const url = `${protocol}://127.0.0.1:${port}`;
   try {
     const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
     const { execSync } = await import('node:child_process');
@@ -316,8 +317,7 @@ async function runCliMode(extraClaudeArgs = [], cwd) {
   // 5. 注册退出处理
   const cleanup = () => {
     killPty();
-    serverMod.stopViewer();
-    process.exit();
+    serverMod.stopViewer().finally(() => process.exit());
   };
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
@@ -360,7 +360,8 @@ async function runCliModeWorkspaceSelector(extraClaudeArgs = []) {
   serverMod.setWorkspaceClaudePath(claudePath, isNpmVersion);
 
   // 自动打开浏览器
-  const url = `http://127.0.0.1:${port}`;
+  const wsProtocol = serverMod.getProtocol();
+  const url = `${wsProtocol}://127.0.0.1:${port}`;
   try {
     const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start' : 'xdg-open';
     const { execSync } = await import('node:child_process');
@@ -373,8 +374,7 @@ async function runCliModeWorkspaceSelector(extraClaudeArgs = []) {
   const { killPty } = await import('./pty-manager.js');
   const cleanup = () => {
     killPty();
-    serverMod.stopViewer();
-    process.exit();
+    serverMod.stopViewer().finally(() => process.exit());
   };
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);

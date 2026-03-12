@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { createServer as createHttpsServer } from 'node:https';
 import { createConnection } from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync, watchFile, unwatchFile, statSync, readdirSync, renameSync, unlinkSync, openSync, readSync, closeSync, realpathSync, mkdirSync, createReadStream } from 'node:fs';
@@ -112,7 +113,8 @@ const ACCESS_TOKEN = randomBytes(16).toString('hex');
 
 let clients = [];
 let server;
-let actualPort = START_PORT;
+let actualPort = 0;
+let serverProtocol = 'http';
 // 跟踪所有被 watch 的日志文件
 const watchedFiles = new Map();
 // Stats Worker 实例
@@ -240,6 +242,16 @@ function watchLogFile(logFile) {
 
 function startWatching() {
   watchLogFile(LOG_FILE);
+}
+
+function getLocalIp() {
+  const nets = networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) return net.address;
+    }
+  }
+  return '127.0.0.1';
 }
 
 async function handleRequest(req, res) {
@@ -1210,18 +1222,8 @@ async function handleRequest(req, res) {
 
   // 返回局域网访问地址
   if (url === '/api/local-url' && method === 'GET') {
-    const nets = networkInterfaces();
-    let localIp = '127.0.0.1';
-    for (const name of Object.keys(nets)) {
-      for (const net of nets[name]) {
-        if (net.family === 'IPv4' && !net.internal) {
-          localIp = net.address;
-          break;
-        }
-      }
-      if (localIp !== '127.0.0.1') break;
-    }
-    const defaultUrl = `http://${localIp}:${actualPort}?token=${ACCESS_TOKEN}`;
+    const localIp = getLocalIp();
+    const defaultUrl = `${serverProtocol}://${localIp}:${actualPort}?token=${ACCESS_TOKEN}`;
     const hookResult = await runWaterfallHook('localUrl', { url: defaultUrl, ip: localIp, port: actualPort, token: ACCESS_TOKEN });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ url: hookResult.url }));
@@ -1648,6 +1650,23 @@ async function handleRequest(req, res) {
 }
 
 export async function startViewer() {
+  // 加载插件（需要在创建服务器之前，以便通过 hook 获取 HTTPS 证书）
+  await loadPlugins();
+
+  // 通过插件 hook 获取 HTTPS 证书选项
+  let httpsOptions = null;
+  try {
+    const httpsResult = await runWaterfallHook('httpsOptions', {});
+    httpsOptions = (httpsResult.pfx || httpsResult.cert) ? httpsResult : null;
+  } catch (err) {
+    console.error('[CC Viewer] httpsOptions hook error:', err.message);
+  }
+
+  const useHttps = !!httpsOptions;
+  const protocol = useHttps ? 'https' : 'http';
+  serverProtocol = protocol;
+  if (useHttps) console.error('[CC Viewer] HTTPS mode enabled via plugin hook');
+
   return new Promise((resolve, reject) => {
     function tryListen(port) {
       if (port > MAX_PORT) {
@@ -1664,14 +1683,25 @@ export async function startViewer() {
       });
       probe.on('error', () => {
         probe.destroy();
-        // 端口空闲，绑定 0.0.0.0
-        const currentServer = createServer(handleRequest);
+        // 端口空闲，绑定
+        let currentServer;
+        if (useHttps) {
+          try {
+            currentServer = createHttpsServer(httpsOptions, handleRequest);
+          } catch (err) {
+            console.error('[CC Viewer] HTTPS server creation failed, falling back to HTTP:', err.message);
+            currentServer = createServer(handleRequest);
+            serverProtocol = 'http';
+          }
+        } else {
+          currentServer = createServer(handleRequest);
+        }
 
         currentServer.listen(port, HOST, () => {
           server = currentServer;
           actualPort = port;
-          const url = `http://127.0.0.1:${port}`;
-          console.error(t('server.started', { host: '127.0.0.1', port }));
+          const url = `${serverProtocol}://127.0.0.1:${port}`;
+          console.error(t('server.started', { host: '127.0.0.1', port, protocol: serverProtocol }));
           // v2.0.69 之前的版本会清空控制台，自动打开浏览器确保用户能看到界面
           try {
             const ccPkgPath = join(__dirname, '..', '@anthropic-ai', 'claude-code', 'package.json');
@@ -1691,10 +1721,9 @@ export async function startViewer() {
           if (isCliMode) {
             setupTerminalWebSocket(currentServer);
           }
-          // 加载插件并通知服务器已启动
-          loadPlugins()
-            .then(() => runParallelHook('serverStarted', { port, host: HOST }))
-            .catch(err => console.error('[CC Viewer] Plugin init error:', err.message));
+          // 通知插件服务器已启动
+          runParallelHook('serverStarted', { port, host: HOST, url, ip: getLocalIp(), token: ACCESS_TOKEN, protocol: serverProtocol })
+            .catch(err => console.error('[CC Viewer] Plugin serverStarted hook error:', err.message));
           resolve(server);
         });
 
@@ -1986,8 +2015,18 @@ export function getPort() {
   return actualPort;
 }
 
+export function getProtocol() {
+  return serverProtocol;
+}
+
+let _stoppingPromise = null;
 export function stopViewer() {
-  runParallelHook('serverStopping').catch(() => {});
+  if (_stoppingPromise) return _stoppingPromise;
+  _stoppingPromise = _doStop();
+  return _stoppingPromise;
+}
+async function _doStop() {
+  try { await Promise.race([runParallelHook('serverStopping'), new Promise(r => setTimeout(r, 3000))]); } catch { }
   // 如果用户未做选择，将临时文件转为正式文件
   if (_resumeState && _resumeState.tempFile) {
     try {
@@ -2051,5 +2090,5 @@ function handleExit() {
   }
 }
 process.on('exit', handleExit);
-process.on('SIGINT', () => { handleExit(); process.exit(); });
-process.on('SIGTERM', () => { handleExit(); process.exit(); });
+process.on('SIGINT', () => { stopViewer().finally(() => process.exit()); });
+process.on('SIGTERM', () => { stopViewer().finally(() => process.exit()); });

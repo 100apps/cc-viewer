@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.5.21 (2026-03-13)
+
+- Refactor: replace hardcoded HTTPS cert with plugin hook `httpsOptions` (waterfall)
+- Enhancement: `serverStarted` hook now receives `{ port, host, url, ip, token }` (added `url`, `ip`, `token`)
+- Fix: `/api/local-url` now respects actual server protocol (HTTP/HTTPS) instead of hardcoded `http://`
+- Enhancement: AskUserQuestion renders selected answers with green checkmark SVG directly on assistant-side card
+- Remove: separate user-selection bubble for AskUserQuestion (merged into assistant card)
+- Fix: AskUserQuestion answer parsing — use regex instead of broken JSON.parse for `"q"="a"` format
+- Enhancement: minimap overlay contrast and activeLine highlight improved
+
+## 1.5.20 (2026-03-12)
+
+- Fix: `proxy-errors.js` missing from npm package, causing `ERR_MODULE_NOT_FOUND` when running `ccv -logger`
+
 ## 1.5.19 (2026-03-12)
 
 - Refactor: ccv argument passthrough — ccv is now a drop-in replacement for claude, all args passed through directly
