@@ -781,8 +781,15 @@ class ChatView extends React.Component {
           );
           // 将 Last Response 关联到该 session 对应的 entry timestamp，用于原文-对话定位
           if (session.entryTimestamp) tsItemMap[session.entryTimestamp] = allItems.length;
+          // 计算 Last Response 中最后一个 pending 的 AskUserQuestion id
+          let respLastPendingAskId = null;
+          for (const block of respContent) {
+            if (block.type === 'tool_use' && block.name === 'AskUserQuestion') {
+              respLastPendingAskId = block.id;
+            }
+          }
           allItems.push(
-            <ChatMessage key="resp-asst" role="assistant" content={respContent} timestamp={session.entryTimestamp} modelInfo={modelInfo} collapseToolResults={collapseToolResults} expandThinking={expandThinking} toolResultMap={{}} />
+            <ChatMessage key="resp-asst" role="assistant" content={respContent} timestamp={session.entryTimestamp} modelInfo={modelInfo} collapseToolResults={collapseToolResults} expandThinking={expandThinking} toolResultMap={{}} askAnswerMap={{}} lastPendingAskId={respLastPendingAskId} cliMode={this.props.cliMode} onAskQuestionSubmit={this.handleAskQuestionSubmit} />
           );
         }
       }
@@ -1080,14 +1087,64 @@ class ChatView extends React.Component {
    * answers: [{ questionIndex, type: 'single'|'multi'|'other', optionIndex, selectedIndices, text }]
    */
   handleAskQuestionSubmit = (answers) => {
-    const ws = this._inputWs;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    if (!this.state.ptyPrompt) return;
+    // Lazily connect WebSocket if not connected (e.g. mobile ChatView with cliMode=false)
+    if (!this._inputWs || this._inputWs.readyState !== WebSocket.OPEN) {
+      this._askAnswerQueue = [...answers];
+      this._askSubmitting = true;
+      this.connectInputWs();
+      this._askWsRetries = 0;
+      this._waitForWsAndSubmit();
+      return;
+    }
 
     this._askAnswerQueue = [...answers];
     this._askSubmitting = true;
+
+    // ptyPrompt may not be available yet (streaming response renders before CLI prompt appears)
+    // Retry with delay until ptyPrompt is detected
+    if (!this.state.ptyPrompt) {
+      this._askPromptRetries = 0;
+      this._waitForPtyPromptAndSubmit();
+      return;
+    }
+
     this._processNextAskAnswer();
   };
+
+  _waitForWsAndSubmit() {
+    this._askWsRetries = (this._askWsRetries || 0) + 1;
+    if (this._askWsRetries > 30) {
+      // Give up after ~3 seconds
+      this._askSubmitting = false;
+      this._askAnswerQueue = [];
+      return;
+    }
+    if (this._inputWs && this._inputWs.readyState === WebSocket.OPEN) {
+      // WS connected, now wait for ptyPrompt
+      if (!this.state.ptyPrompt) {
+        this._askPromptRetries = 0;
+        this._waitForPtyPromptAndSubmit();
+      } else {
+        this._processNextAskAnswer();
+      }
+      return;
+    }
+    setTimeout(() => this._waitForWsAndSubmit(), 100);
+  }
+
+  _waitForPtyPromptAndSubmit() {
+    this._askPromptRetries = (this._askPromptRetries || 0) + 1;
+    if (this._askPromptRetries > 50) {
+      // Timeout: proceed without ptyPrompt (assume first option selected, CLI default)
+      this._processNextAskAnswer();
+      return;
+    }
+    if (this.state.ptyPrompt) {
+      this._processNextAskAnswer();
+      return;
+    }
+    setTimeout(() => this._waitForPtyPromptAndSubmit(), 100);
+  }
 
   _processNextAskAnswer() {
     if (!this._askAnswerQueue || this._askAnswerQueue.length === 0) {
@@ -1108,14 +1165,22 @@ class ChatView extends React.Component {
     const ws = this._inputWs;
     if (!ws || ws.readyState !== WebSocket.OPEN) { this._askSubmitting = false; return; }
     const prompt = this.state.ptyPrompt;
-    if (!prompt) { this._askSubmitting = false; return; }
 
     // optionIndex is 0-based index into the CLI option list; option number = optionIndex + 1
     const targetNumber = answer.optionIndex + 1;
-    const options = prompt.options;
-    const targetIdx = options.findIndex(o => o.number === targetNumber);
-    let currentIdx = options.findIndex(o => o.selected);
-    if (currentIdx < 0) currentIdx = 0;
+    let targetIdx, currentIdx;
+
+    if (prompt && prompt.options) {
+      const options = prompt.options;
+      targetIdx = options.findIndex(o => o.number === targetNumber);
+      if (targetIdx < 0) targetIdx = answer.optionIndex;
+      currentIdx = options.findIndex(o => o.selected);
+      if (currentIdx < 0) currentIdx = 0;
+    } else {
+      // No ptyPrompt available: assume first option is selected (CLI default)
+      targetIdx = answer.optionIndex;
+      currentIdx = 0;
+    }
 
     const diff = targetIdx - currentIdx;
     const arrowKey = diff > 0 ? '\x1b[B' : '\x1b[A';
@@ -1141,13 +1206,14 @@ class ChatView extends React.Component {
     const ws = this._inputWs;
     if (!ws || ws.readyState !== WebSocket.OPEN) { this._askSubmitting = false; return; }
     const prompt = this.state.ptyPrompt;
-    if (!prompt) { this._askSubmitting = false; return; }
 
     // selectedIndices: 0-based indices into CLI option list
     const indices = (answer.selectedIndices || []).slice().sort((a, b) => a - b);
-    const options = prompt.options;
-    let currentIdx = options.findIndex(o => o.selected);
-    if (currentIdx < 0) currentIdx = 0;
+    let currentIdx = 0;
+    if (prompt && prompt.options) {
+      currentIdx = prompt.options.findIndex(o => o.selected);
+      if (currentIdx < 0) currentIdx = 0;
+    }
 
     // Navigate to each selected option and press Space to toggle
     const toggleNext = (si) => {
@@ -1188,13 +1254,14 @@ class ChatView extends React.Component {
     const ws = this._inputWs;
     if (!ws || ws.readyState !== WebSocket.OPEN) { this._askSubmitting = false; return; }
     const prompt = this.state.ptyPrompt;
-    if (!prompt) { this._askSubmitting = false; return; }
 
     // "Other" is always the last option in the CLI list
-    const options = prompt.options;
-    const targetIdx = options.length - 1;
-    let currentIdx = options.findIndex(o => o.selected);
-    if (currentIdx < 0) currentIdx = 0;
+    const targetIdx = answer.optionIndex; // optionIndex = options.length (0-based, "Other" is after all options)
+    let currentIdx = 0;
+    if (prompt && prompt.options) {
+      currentIdx = prompt.options.findIndex(o => o.selected);
+      if (currentIdx < 0) currentIdx = 0;
+    }
 
     const diff = targetIdx - currentIdx;
     const arrowKey = diff > 0 ? '\x1b[B' : '\x1b[A';

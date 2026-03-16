@@ -33,7 +33,8 @@ class ChatMessage extends React.Component {
   }
 
   componentDidUpdate(prevProps) {
-    if (prevProps.lastPendingAskId !== this.props.lastPendingAskId) {
+    if (prevProps.lastPendingAskId !== this.props.lastPendingAskId
+      || prevProps.askAnswerMap !== this.props.askAnswerMap) {
       this.setState({
         askSelections: {},
         askMultiSelections: {},
@@ -291,7 +292,7 @@ class ChatMessage extends React.Component {
       const selectedAnswers = askAnswerMap?.[tu.id] || {};
       const hasAnswers = Object.keys(selectedAnswers).length > 0;
       const isPending = !hasAnswers;
-      const isInteractive = isPending && this.props.cliMode && tu.id === this.props.lastPendingAskId;
+      const isInteractive = isPending && this.props.onAskQuestionSubmit && tu.id === this.props.lastPendingAskId;
 
       if (isInteractive) {
         return this.renderAskQuestionInteractive(tu.id, questions);
@@ -541,32 +542,39 @@ class ChatMessage extends React.Component {
               <div className={styles.askQuestionText}>{q.question}</div>
 
               {!isMulti ? (
-                <Radio.Group
-                  className={styles.askRadioGroup}
-                  value={askOtherActive[qi] ? '__other__' : (selectedLabel || undefined)}
-                  onChange={e => {
-                    const val = e.target.value;
-                    if (val === '__other__') {
+                <div className={styles.askRadioGroup}>
+                  {(q.options || []).map((opt, oi) => {
+                    const isSelected = !askOtherActive[qi] && selectedLabel === opt.label;
+                    return (
+                      <div
+                        key={oi}
+                        className={`${styles.askRadioItem}${isSelected ? ' ' + styles.askRadioItemSelected : ''}`}
+                        onClick={() => {
+                          this.setState(prev => ({
+                            askSelections: { ...prev.askSelections, [qi]: opt.label },
+                            askOtherActive: { ...prev.askOtherActive, [qi]: false },
+                          }));
+                        }}
+                      >
+                        <span className={styles.askRadioDot}>{isSelected ? '◉' : '○'}</span>
+                        {opt.label}
+                        {opt.description && <span className={styles.optionDesc}>— {opt.description}</span>}
+                      </div>
+                    );
+                  })}
+                  <div
+                    className={`${styles.askRadioItem}${askOtherActive[qi] ? ' ' + styles.askRadioItemSelected : ''}`}
+                    onClick={() => {
                       this.setState(prev => ({
                         askOtherActive: { ...prev.askOtherActive, [qi]: true },
                         askSelections: { ...prev.askSelections, [qi]: undefined },
                       }));
-                    } else {
-                      this.setState(prev => ({
-                        askSelections: { ...prev.askSelections, [qi]: val },
-                        askOtherActive: { ...prev.askOtherActive, [qi]: false },
-                      }));
-                    }
-                  }}
-                >
-                  {(q.options || []).map((opt, oi) => (
-                    <Radio key={oi} value={opt.label}>
-                      {opt.label}
-                      {opt.description && <span className={styles.optionDesc}>— {opt.description}</span>}
-                    </Radio>
-                  ))}
-                  <Radio value="__other__">{t('ui.askOther')}</Radio>
-                </Radio.Group>
+                    }}
+                  >
+                    <span className={styles.askRadioDot}>{askOtherActive[qi] ? '◉' : '○'}</span>
+                    {t('ui.askOther')}
+                  </div>
+                </div>
               ) : (
                 <Checkbox.Group
                   className={styles.askCheckboxGroup}

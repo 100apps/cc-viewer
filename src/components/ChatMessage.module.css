@@ -615,11 +615,48 @@
   margin-top: 4px;
 }
 
+.askRadioItem {
+  color: #d1d5db;
+  font-size: 12px;
+  padding: 3px 0;
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  user-select: none;
+}
+
+.askRadioItem:hover {
+  color: #ffffff;
+}
+
+.askRadioItemSelected {
+  color: #58a6ff;
+}
+
+.askRadioDot {
+  flex-shrink: 0;
+  font-size: 13px;
+  line-height: 1;
+}
+
 .askRadioGroup :global(.ant-radio-wrapper),
 .askCheckboxGroup :global(.ant-checkbox-wrapper) {
   color: #d1d5db;
   font-size: 12px;
   padding: 3px 0;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.askRadioGroup :global(.ant-radio-wrapper > span),
+.askRadioGroup :global(.ant-radio) {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.askRadioGroup :global(.ant-radio-input) {
+  cursor: pointer;
 }
 
 .askCheckboxGroup {

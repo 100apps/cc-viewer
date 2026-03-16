@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.41 (2026-03-17)
+
+- Fix: AskUserQuestion single-select radio now clickable — replaced antd Radio.Group with custom div-based radio implementation
+- Fix: AskUserQuestion interactive card renders in streaming "Last Response" — passes askAnswerMap, lastPendingAskId, onAskQuestionSubmit props
+- Fix: CLI pre-answer detection — componentDidUpdate watches askAnswerMap changes to auto-replace interactive card with static answered card
+- Fix: submit works without ptyPrompt — falls back to assuming first option selected (CLI default) when terminal prompt not detected
+- Fix: mobile AskUserQuestion interactive — lazy WebSocket connect on submit, uses onAskQuestionSubmit gate instead of cliMode
+
 ## 1.5.40 (2026-03-16)
 
 - Feature: log preview Popover — hover (desktop) or click (mobile) to see all user prompts in a floating panel
