@@ -13,7 +13,7 @@ const KNOWN_DOCS = new Set([
   'Tool-EnterPlanMode', 'Tool-ExitPlanMode',
   'Tool-AskUserQuestion', 'Tool-Skill',
   'Tool-getDiagnostics', 'Tool-executeCode',
-  'MainAgent', 'Tools', 'CacheRebuild', 'BodyDiffJSON', 'TranslateContextPollution',
+  'MainAgent', 'Tools', 'CacheRebuild', 'BodyDiffJSON', 'TranslateContextPollution', 'KVCacheContent',
 ]);
 
 export default function ConceptHelp({ doc }) {

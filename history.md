@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.0 (2026-03-18)
+
+- Feature: Teammate display optimization — teammate entries in ChatView now show `Teammate: name(model)` format with dedicated team icon and per-name HSL color hashing for visual distinction
+- Feature: new `formatTeammateLabel()` in requestType.js for model name simplification (`claude-sonnet-4-6-20250514` → `sonnet-4-6`)
+- Feature: `getSvgAvatar('teammate')` — new two-person collaboration SVG icon for teammate avatars
+- Fix: Opus 4.6 1M context window — `context-watcher.js` no longer overwrites Claude Code's accurate 1M `context_window_size` with inferred 200K; client-side `getModelMaxTokens` now supports `[1m]` suffix
+- Fix: `serverCachedContent` leak — `loadLocalLogFile()` now clears `serverCachedContent` to prevent stale live-session cache data from polluting local log view
+- Docs: updated KVCacheContent concept docs across all 17 language versions
+
 ## 1.5.45 (2026-03-17)
 
 - Fix: KV-Cache user prompt navigation — added SVG marching-ants dashed border animation on highlighted cache blocks (matching ChatMessage style)

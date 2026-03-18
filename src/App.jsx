@@ -63,6 +63,7 @@ class App extends React.Component {
       mobileLogMgmtVisible: false,
       mobileSettingsVisible: false,
       mobilePromptVisible: false,
+      serverCachedContent: null,
     };
     this.eventSource = null;
     this._autoSelectTimer = null;
@@ -317,6 +318,7 @@ class App extends React.Component {
                   mainAgentSessions,
                   fileLoading: false,
                   fileLoadingCount: 0,
+                  serverCachedContent: null,
                 });
                 if (isMobile && this.state.projectName) {
                   saveEntries(this.state.projectName, entries);
@@ -329,6 +331,7 @@ class App extends React.Component {
                 mainAgentSessions,
                 fileLoading: false,
                 fileLoadingCount: 0,
+                serverCachedContent: null,
               });
               if (isMobile) clearEntries();
             }
@@ -375,6 +378,14 @@ class App extends React.Component {
           this.setState({ contextWindow: data });
         } catch { }
       });
+      this.eventSource.addEventListener('kv_cache_content', (event) => {
+        try {
+          const cached = JSON.parse(event.data);
+          this.setState({ serverCachedContent: cached });
+        } catch (err) {
+          console.error('Failed to parse kv_cache_content:', err);
+        }
+      });
       this.eventSource.onerror = () => console.error('SSE连接错误');
     } catch (error) {
       console.error('EventSource初始化失败:', error);
@@ -415,10 +426,11 @@ class App extends React.Component {
               mainAgentSessions,
               fileLoading: false,
               fileLoadingCount: 0,
+              serverCachedContent: null,
             });
           });
         } else {
-          this.setState({ fileLoading: false, fileLoadingCount: 0 });
+          this.setState({ fileLoading: false, fileLoadingCount: 0, serverCachedContent: null });
         }
       })
       .catch(err => {
@@ -625,9 +637,9 @@ class App extends React.Component {
       if (isMainAgent(selectedReq) && selectedReq.timestamp) {
         targetTs = selectedReq.timestamp;
       } else {
-        // SubAgent 请求直接用自身 timestamp
+        // SubAgent / Teammate 请求直接用自身 timestamp
         const cls = classifyRequest(selectedReq);
-        if (cls.type === 'SubAgent' && selectedReq.timestamp) {
+        if ((cls.type === 'SubAgent' || cls.type === 'Teammate') && selectedReq.timestamp) {
           targetTs = selectedReq.timestamp;
         } else {
           const idx = prev.requests.indexOf(selectedReq);
@@ -692,9 +704,9 @@ class App extends React.Component {
         if (isMainAgent(selectedReq) && selectedReq.timestamp) {
           targetTs = selectedReq.timestamp;
         } else {
-          // SubAgent 请求直接用自身 timestamp
+          // SubAgent / Teammate 请求直接用自身 timestamp
           const cls = classifyRequest(selectedReq);
-          if (cls.type === 'SubAgent' && selectedReq.timestamp) {
+          if ((cls.type === 'SubAgent' || cls.type === 'Teammate') && selectedReq.timestamp) {
             targetTs = selectedReq.timestamp;
           } else {
             // 非 mainAgent 请求，向前找最近的 mainAgent
@@ -1642,6 +1654,7 @@ class App extends React.Component {
               onReturnToWorkspaces={this.state.cliMode ? this.handleReturnToWorkspaces : null}
               contextWindow={this.state.contextWindow}
               onNavigateCacheMsg={this.handleNavigateCacheMsg}
+              serverCachedContent={this.state.serverCachedContent}
             />
           </Layout.Header>
 

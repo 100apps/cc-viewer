@@ -33,12 +33,26 @@ export default function MobileStats({ requests = [], visible, onClose }) {
       if (cls.type === 'SubAgent') {
         const label = cls.subType || 'Other';
         subAgentCounts[label] = (subAgentCounts[label] || 0) + 1;
+      } else if (cls.type === 'Teammate') {
+        const label = cls.subType ? `Teammate:${cls.subType}` : 'Teammate';
+        subAgentCounts[label] = (subAgentCounts[label] || 0) + 1;
       }
     }
     const subAgentEntries = Object.entries(subAgentCounts).sort((a, b) => b[1] - a[1]);
     const hasSubAgentStats = subAgentEntries.length > 0;
 
-    const isEmpty = models.length === 0 && toolStats.length === 0 && !hasCacheStats && !hasSubAgentStats && skillStats.length === 0;
+    const teammateCounts = {};
+    for (let i = 0; i < requests.length; i++) {
+      const cls = classifyRequest(requests[i], requests[i + 1]);
+      if (cls.type === 'Teammate') {
+        const label = cls.subType || 'Teammate';
+        teammateCounts[label] = (teammateCounts[label] || 0) + 1;
+      }
+    }
+    const teammateEntries = Object.entries(teammateCounts).sort((a, b) => b[1] - a[1]);
+    const hasTeammateStats = teammateEntries.length > 0;
+
+    const isEmpty = models.length === 0 && toolStats.length === 0 && !hasCacheStats && !hasSubAgentStats && !hasTeammateStats && skillStats.length === 0;
 
     return { byModel, models, toolStats, skillStats, cacheStats, activeReasons, totalCount, totalCache, hasCacheStats, subAgentEntries, hasSubAgentStats, isEmpty };
   }, [requests]);
@@ -110,6 +124,35 @@ export default function MobileStats({ requests = [], visible, onClose }) {
                       <tr className={headerStyles.rebuildTotalRow}>
                         <td className={headerStyles.label}>Total</td>
                         <td className={headerStyles.td}>{subAgentEntries.reduce((s, e) => s + e[1], 0)}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* 2.5 Teammate Stats */}
+            {hasTeammateStats && (
+              <div className={headerStyles.modelCard}>
+                <div className={headerStyles.modelName}>Teammate</div>
+                <table className={headerStyles.statsTable}>
+                  <thead>
+                    <tr>
+                      <td className={headerStyles.th} style={{ textAlign: 'left' }}>Name</td>
+                      <td className={headerStyles.th}>{t('ui.cacheRebuild.count')}</td>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teammateEntries.map(([name, count]) => (
+                      <tr key={name} className={headerStyles.rowBorder}>
+                        <td className={headerStyles.label}>{name}</td>
+                        <td className={headerStyles.td}>{count}</td>
+                      </tr>
+                    ))}
+                    {teammateEntries.length > 1 && (
+                      <tr className={headerStyles.rebuildTotalRow}>
+                        <td className={headerStyles.label}>Total</td>
+                        <td className={headerStyles.td}>{teammateEntries.reduce((s, e) => s + e[1], 0)}</td>
                       </tr>
                     )}
                   </tbody>

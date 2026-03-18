@@ -117,4 +117,80 @@ describe('context-watcher: updateContextWindowFromResponse', () => {
       restoreContextFile();
     }
   });
+
+  it('preserves larger existing context_window_size (1M from Claude Code statusLine)', () => {
+    backupContextFile();
+    try {
+      mkdirSync(CLAUDE_DIR, { recursive: true });
+      // Simulate Claude Code statusLine having written 1M context_window_size
+      const existing = {
+        context_window: {
+          context_window_size: 1000000,
+          used_percentage: 10,
+        },
+      };
+      writeFileSync(CONTEXT_WINDOW_FILE, JSON.stringify(existing) + '\n');
+
+      const responseBody = {
+        usage: { input_tokens: 50000, output_tokens: 10000 },
+      };
+
+      // Model name has no [1m] suffix, so inferContextWindowSize returns 200000
+      updateContextWindowFromResponse(responseBody, {}, 'claude-opus-4-6-20250514');
+
+      const data = JSON.parse(readFileSync(CONTEXT_WINDOW_FILE, 'utf-8'));
+      // Should preserve the larger 1M value, not overwrite with 200K
+      assert.equal(data.context_window.context_window_size, 1000000);
+      // Percentage should be based on 1M: (60000 / 1000000) * 100 = 6
+      assert.equal(data.context_window.used_percentage, 6);
+    } finally {
+      restoreContextFile();
+    }
+  });
+
+  it('uses inferred size when no existing context_window_size', () => {
+    backupContextFile();
+    try {
+      mkdirSync(CLAUDE_DIR, { recursive: true });
+      if (existsSync(CONTEXT_WINDOW_FILE)) unlinkSync(CONTEXT_WINDOW_FILE);
+
+      const responseBody = {
+        usage: { input_tokens: 50000, output_tokens: 10000 },
+      };
+
+      updateContextWindowFromResponse(responseBody, {}, 'claude-sonnet-4-6-20250514');
+
+      const data = JSON.parse(readFileSync(CONTEXT_WINDOW_FILE, 'utf-8'));
+      assert.equal(data.context_window.context_window_size, 200000);
+      // (60000 / 200000) * 100 = 30
+      assert.equal(data.context_window.used_percentage, 30);
+    } finally {
+      restoreContextFile();
+    }
+  });
+
+  it('does not downgrade context_window_size from existing larger value', () => {
+    backupContextFile();
+    try {
+      mkdirSync(CLAUDE_DIR, { recursive: true });
+      // Existing file has 1M from a previous [1m] model inference
+      const existing = {
+        context_window: { context_window_size: 1000000, used_percentage: 5 },
+      };
+      writeFileSync(CONTEXT_WINDOW_FILE, JSON.stringify(existing) + '\n');
+
+      const responseBody = {
+        usage: { input_tokens: 100000, output_tokens: 5000 },
+      };
+
+      // inferContextWindowSize('claude-haiku-4-5') = 200000, but existing is 1M
+      updateContextWindowFromResponse(responseBody, {}, 'claude-haiku-4-5');
+
+      const data = JSON.parse(readFileSync(CONTEXT_WINDOW_FILE, 'utf-8'));
+      // Should keep 1M (larger), not downgrade to 200K
+      assert.equal(data.context_window.context_window_size, 1000000);
+    } finally {
+      restoreContextFile();
+    }
+  });
 });

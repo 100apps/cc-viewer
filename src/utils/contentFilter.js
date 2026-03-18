@@ -1,10 +1,13 @@
 // 内容分类与过滤规则
 // ChatView（对话模式）和 AppHeader（用户 Prompt 弹窗）共用此模块，确保过滤逻辑一致。
-// MainAgent 判断也收敛于此，供全局统一调用。
+// MainAgent / Teammate 判断也收敛于此，供全局统一调用。
 
 // ============== 请求体辅助 ==============
 
 const SUBAGENT_SYSTEM_RE = /command execution specialist|file search specialist|planning specialist|general-purpose agent/i;
+
+// Teammate 检测：system prompt 中包含 Agent Teammate Communication 标记
+const TEAMMATE_SYSTEM_RE = /running as an agent in a team|Agent Teammate Communication/i;
 
 /**
  * 提取请求体中的 system prompt 文本
@@ -19,11 +22,28 @@ export function getSystemText(body) {
 }
 
 /**
+ * 判断请求是否为 Teammate 子进程的请求。
+ * 支持两种检测：interceptor 模式（req.teammate 字段）和 proxy 模式（system prompt 标记）。
+ * 全局唯一入口，与 isMainAgent 同级。
+ */
+export function isTeammate(req) {
+  if (!req) return false;
+  // interceptor 模式：通过 process.argv 写入的 teammate 字段
+  if (req.teammate) return true;
+  // proxy 模式：通过 system prompt 检测
+  const sysText = getSystemText(req.body || {});
+  return TEAMMATE_SYSTEM_RE.test(sysText);
+}
+
+/**
  * 判断请求是否为 MainAgent 请求。
  * 包含 interceptor 标记校验 + 新旧架构检测，全局唯一入口。
  */
 export function isMainAgent(req) {
   if (!req) return false;
+
+  // Teammate 子进程的请求不是 MainAgent，避免污染主会话视图
+  if (isTeammate(req)) return false;
 
   if (req.mainAgent) {
     // 排除被误标记的 SubAgent（旧日志兼容）

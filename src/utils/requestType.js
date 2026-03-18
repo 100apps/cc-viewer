@@ -1,9 +1,9 @@
 /**
  * 请求类型分类工具
  * classifyRequest(req, nextReq?) 返回 { type, subType }
- * type: 'MainAgent' | 'SubAgent' | 'Count' | 'Preflight' | 'Plan'
+ * type: 'MainAgent' | 'SubAgent' | 'Teammate' | 'Count' | 'Preflight' | 'Plan'
  */
-import { isMainAgent, getSystemText } from './contentFilter';
+import { isMainAgent, isTeammate, getSystemText } from './contentFilter';
 
 function getMessageText(msg) {
   const c = msg?.content;
@@ -103,6 +103,11 @@ function isPreflightRequest(req, nextReq) {
  * @param {object} [nextReq] - 下一条请求（用于 Preflight 判断）
  */
 export function classifyRequest(req, nextReq) {
+  // Teammate 子进程的请求优先识别（收敛于 contentFilter.isTeammate）
+  if (isTeammate(req)) {
+    return { type: 'Teammate', subType: req.teammate || null };
+  }
+
   if (isMainAgent(req)) {
     return { type: 'MainAgent', subType: null };
   }
@@ -126,7 +131,16 @@ export function classifyRequest(req, nextReq) {
 
 // Tag 显示文本
 export function formatRequestTag(type, subType) {
+  if (type === 'Teammate' && subType) return `Teammate:${subType}`;
   if (type === 'Plan' && subType) return `Plan:${subType}`;
   if (type === 'SubAgent' && subType) return `SubAgent:${subType}`;
   return type;
+}
+
+// Teammate label: "Teammate: name(model-short)" or "Teammate: name"
+export function formatTeammateLabel(name, model) {
+  const displayName = name || 'X';
+  if (!model) return `Teammate: ${displayName}`;
+  const short = model.replace(/^claude-/i, '').replace(/-\d{8}$/, '');
+  return `Teammate: ${displayName}(${short})`;
 }

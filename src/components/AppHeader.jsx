@@ -446,8 +446,8 @@ class AppHeader extends React.Component {
   }
 
   renderCacheContentPopover(contextPercent) {
-    const { requests = [] } = this.props;
-    const cached = extractCachedContent(requests);
+    const { requests = [], serverCachedContent } = this.props;
+    const cached = serverCachedContent || extractCachedContent(requests);
 
     if (!cached || (cached.system.length === 0 && cached.messages.length === 0 && cached.tools.length === 0)) {
       return <div className={styles.cachePopoverEmpty}>{t('ui.noCachedContent')}</div>;
@@ -537,6 +537,7 @@ class AppHeader extends React.Component {
         <div className={styles.cachePopoverHeader}>
           <div className={styles.cachePopoverTitle}>
             {t('ui.cachedContentTitle')}
+            <ConceptHelp doc="KVCacheContent" />
             <CopyOutlined
               className={styles.cacheCopyBtn}
               onClick={() => {
@@ -592,18 +593,24 @@ class AppHeader extends React.Component {
 
     // SubAgent 统计
     const subAgentCounts = {};
+    const teammateCounts = {};
     for (let i = 0; i < requests.length; i++) {
       const cls = classifyRequest(requests[i], requests[i + 1]);
       if (cls.type === 'SubAgent') {
         const label = cls.subType || 'Other';
         subAgentCounts[label] = (subAgentCounts[label] || 0) + 1;
+      } else if (cls.type === 'Teammate') {
+        const label = cls.subType || 'Teammate';
+        teammateCounts[label] = (teammateCounts[label] || 0) + 1;
       }
     }
     const subAgentEntries = Object.entries(subAgentCounts).sort((a, b) => b[1] - a[1]);
+    const teammateEntries = Object.entries(teammateCounts).sort((a, b) => b[1] - a[1]);
 
     const hasCacheStats = activeReasons.length > 0;
     const hasSubAgentStats = subAgentEntries.length > 0;
-    if (!hasCacheStats && !hasSubAgentStats) return null;
+    const hasTeammateStats = teammateEntries.length > 0;
+    if (!hasCacheStats && !hasSubAgentStats && !hasTeammateStats) return null;
 
     return (
       <div className={styles.toolStatsColumn}>
@@ -658,6 +665,33 @@ class AppHeader extends React.Component {
                 <tr className={styles.rebuildTotalRow}>
                   <td className={styles.label}>Total</td>
                   <td className={styles.td}>{subAgentEntries.reduce((s, e) => s + e[1], 0)}</td>
+                </tr>
+              )}
+            </tbody>
+            </table>
+          </div>
+        )}
+        {hasTeammateStats && (
+          <div className={styles.modelCard}>
+            <div className={styles.modelName}>Teammate</div>
+            <table className={styles.statsTable}>
+            <thead>
+              <tr>
+                <td className={styles.th} style={{ textAlign: 'left' }}>Name</td>
+                <td className={styles.th}>{t('ui.cacheRebuild.count')}</td>
+              </tr>
+            </thead>
+            <tbody>
+              {teammateEntries.map(([name, count]) => (
+                <tr key={name} className={styles.rowBorder}>
+                  <td className={styles.label}>{name}</td>
+                  <td className={styles.td}>{count}</td>
+                </tr>
+              ))}
+              {teammateEntries.length > 1 && (
+                <tr className={styles.rebuildTotalRow}>
+                  <td className={styles.label}>Total</td>
+                  <td className={styles.td}>{teammateEntries.reduce((s, e) => s + e[1], 0)}</td>
                 </tr>
               )}
             </tbody>
@@ -1003,7 +1037,7 @@ class AppHeader extends React.Component {
   }
 
   render() {
-    const { requestCount, requests = [], viewMode, cacheType, onToggleViewMode, onImportLocalLogs, onLangChange, isLocalLog, localLogFile, projectName, collapseToolResults, onCollapseToolResultsChange, expandThinking, onExpandThinkingChange, expandDiff, onExpandDiffChange, filterIrrelevant, onFilterIrrelevantChange, updateInfo, onDismissUpdate, cliMode, terminalVisible, onToggleTerminal, onReturnToWorkspaces, contextWindow } = this.props;
+    const { requestCount, requests = [], viewMode, cacheType, onToggleViewMode, onImportLocalLogs, onLangChange, isLocalLog, localLogFile, projectName, collapseToolResults, onCollapseToolResultsChange, expandThinking, onExpandThinkingChange, expandDiff, onExpandDiffChange, filterIrrelevant, onFilterIrrelevantChange, updateInfo, onDismissUpdate, cliMode, terminalVisible, onToggleTerminal, onReturnToWorkspaces, contextWindow, serverCachedContent } = this.props;
     const { countdownText } = this.state;
 
     const menuItems = [
@@ -1151,11 +1185,11 @@ class AppHeader extends React.Component {
               </Tag>
             ) : (
               <Popover
-                content={this.renderCacheContentPopover(contextPercent)}
+                content={this.state._cachePopoverOpen ? this.renderCacheContentPopover(contextPercent) : <div style={{ minWidth: 300 }} />}
                 trigger="hover"
                 placement="bottomLeft"
                 overlayInnerStyle={{ background: '#1e1e1e', border: '1px solid #3a3a3a', borderRadius: 8, padding: '8px 8px' }}
-                onOpenChange={(open) => { if (!open) this._cacheScrollInited = false; }}
+                onOpenChange={(open) => { this.setState({ _cachePopoverOpen: open }); if (!open) this._cacheScrollInited = false; }}
               >
                 <span className={styles.liveTag} style={{ borderColor: ctxColor, color: ctxColor }}>
                   <span className={styles.liveTagFill} style={{ width: `${contextPercent}%`, backgroundColor: ctxColor }} />

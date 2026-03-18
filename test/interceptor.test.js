@@ -196,6 +196,19 @@ describe('interceptor', () => {
       };
       assert.equal(isMainAgentRequest(body), true);
     });
+
+    it('does not filter teammate requests (teammate handling is in interceptor layer)', () => {
+      // Teammate body looks identical to MainAgent — same system prompt, same tools
+      // interceptor-core should NOT filter it; that's the interceptor.js / frontend layer's job
+      const teammateBody = makeMainAgentBody({
+        system: [
+          { type: 'text', text: 'You are Claude Code, Anthropic\'s official CLI for Claude.' },
+          { type: 'text', text: '# Agent Teammate Communication\n\nIMPORTANT: You are running as an agent in a team.' },
+        ],
+      });
+      // interceptor-core treats this as MainAgent (body-level only, no req.teammate field)
+      assert.equal(isMainAgentRequest(teammateBody), true);
+    });
   });
 
   // --------------------------------------------------------------------------

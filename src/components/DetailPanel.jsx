@@ -571,7 +571,7 @@ class DetailPanel extends React.Component {
       },
       {
         key: 'kv-cache-text',
-        label: 'KV-Cache-Text',
+        label: <span>KV-Cache-Text <ConceptHelp doc="KVCacheContent" /></span>,
         children: (
           <div className={styles.tabContent} style={{ height: 'calc(100vh - 220px)', minHeight: 400 }}>
             {(() => {

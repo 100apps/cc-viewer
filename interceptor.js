@@ -80,6 +80,19 @@ function resolveResumeChoice(choice) {
   return result;
 }
 
+// Teammate 子进程检测：teammate 通过 --parent-session-id 启动（提前到日志路径初始化之前）
+const _isTeammate = process.argv.includes('--parent-session-id');
+// 提取 teammate 元数据（--agent-name worker-1 --team-name fix-ts-errors）
+let _teammateName = null;
+let _teamName = null;
+if (_isTeammate) {
+  const args = process.argv;
+  const nameIdx = args.indexOf('--agent-name');
+  if (nameIdx !== -1 && nameIdx + 1 < args.length) _teammateName = args[nameIdx + 1];
+  const teamIdx = args.indexOf('--team-name');
+  if (teamIdx !== -1 && teamIdx + 1 < args.length) _teamName = args[teamIdx + 1];
+}
+
 // 初始化日志文件路径（异步，支持用户交互）
 // 工作区模式下延迟到选择工作区后再初始化
 let _newLogFile, _logDir, _projectName;
@@ -87,6 +100,14 @@ if (process.env.CCV_WORKSPACE_MODE === '1') {
   _newLogFile = '';
   _logDir = '';
   _projectName = '';
+} else if (_isTeammate) {
+  // Teammate 子进程：只需 projectName 和 logDir 来查找 leader 日志，不生成新文件路径
+  let cwd;
+  try { cwd = process.cwd(); } catch { cwd = homedir(); }
+  _projectName = basename(cwd).replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+  _logDir = join(LOG_DIR, _projectName);
+  const _leaderLog = findRecentLog(_logDir, _projectName);
+  _newLogFile = _leaderLog || ''; // 没有 leader 日志时不写入
 } else {
   ({ filePath: _newLogFile, dir: _logDir, projectName: _projectName } = generateNewLogFilePath());
   // 启动时清理残留临时文件
@@ -96,10 +117,11 @@ let LOG_FILE = _newLogFile;
 
 const _initPromise = (async () => {
   if (!_logDir || !_projectName) return; // 工作区模式下跳过
+  if (_isTeammate) return; // Teammate 已在上方同步初始化，跳过 async resume 流程
   try {
     const recentLog = findRecentLog(_logDir, _projectName);
     if (recentLog) {
-      // 始终复用最新日志文件
+      // Leader / 普通进程：走 resume 交互流程
       const tempFile = _newLogFile.replace('.jsonl', '_temp.jsonl');
       LOG_FILE = tempFile;
       _resumeState = {
@@ -195,17 +217,20 @@ export function setupInterceptor() {
   globalThis._ccViewerInterceptorInstalled = true;
 
   // 启动 viewer 服务（优先根目录 server.js，fallback 到 lib/server.js）
-  const rootServerPath = join(__dirname, 'server.js');
-  const libServerPath = join(__dirname, 'lib', 'server.js');
-  import(rootServerPath).then(module => {
-    viewerModule = module;
-  }).catch(() => {
-    import(libServerPath).then(module => {
+  // Teammate 子进程跳过，避免端口冲突（leader 已启动 viewer）
+  if (!_isTeammate) {
+    const rootServerPath = join(__dirname, 'server.js');
+    const libServerPath = join(__dirname, 'lib', 'server.js');
+    import(rootServerPath).then(module => {
       viewerModule = module;
     }).catch(() => {
-      // Silently fail if viewer service cannot start
+      import(libServerPath).then(module => {
+        viewerModule = module;
+      }).catch(() => {
+        // Silently fail if viewer service cannot start
+      });
     });
-  });
+  }
 
   // 注册退出处理器
   const cleanupViewer = async () => {
@@ -318,7 +343,8 @@ export function setupInterceptor() {
           isStream: body?.stream === true,
           isHeartbeat: /\/api\/eval\/sdk-/.test(urlStr),
           isCountTokens: /\/messages\/count_tokens/.test(urlStr),
-          mainAgent: isMainAgentRequest(body)
+          mainAgent: isMainAgentRequest(body),
+          ...(_isTeammate && { teammate: _teammateName, teamName: _teamName })
         };
       }
     } catch { }
@@ -494,11 +520,13 @@ export function setupInterceptor() {
 // 自动执行拦截器设置
 // proxy 模式下（ccv CLI 或 ccv run），外层 proxy.js 已显式调用 setupInterceptor()，
 // 这里跳过自动执行，避免 Claude 进程中重复拦截 fetch
-if (!_ccvSkip && !process.env.CCV_PROXY_MODE) setupInterceptor();
+// Teammate 子进程即使继承了 CCV_PROXY_MODE 也需要启用拦截（它是独立 claude 进程，不走 proxy）
+if (!_ccvSkip && (!process.env.CCV_PROXY_MODE || _isTeammate)) setupInterceptor();
 
 // 等待日志文件初始化完成后启动 Web Viewer 服务
 // 如果是 ccv --c 通过 proxy 模式启动的，外层已有 server，跳过
-if (!_ccvSkip && !process.env.CCV_PROXY_MODE) {
+// Teammate 子进程也跳过，避免端口冲突（leader 已启动 viewer）
+if (!_ccvSkip && !process.env.CCV_PROXY_MODE && !_isTeammate) {
   _initPromise.then(() => import('./server.js')).catch((err) => {
     console.error('[CC-Viewer] Failed to start viewer server:', err);
   });

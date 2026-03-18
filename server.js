@@ -42,6 +42,7 @@ import { getUserProfile } from './lib/user-profile.js';
 import { getGitDiffs } from './lib/git-diff.js';
 import { watchContextWindow, CONTEXT_WINDOW_FILE } from './lib/context-watcher.js';
 import { readLogFile, watchLogFile, startWatching, getWatchedFiles } from './lib/log-watcher.js';
+import { isMainAgentEntry, extractCachedContent } from './lib/kv-cache-analyzer.js';
 
 const PREFS_FILE = join(LOG_DIR, 'preferences.json');
 const isCliMode = process.env.CCV_CLI_MODE === '1';
@@ -682,6 +683,17 @@ async function handleRequest(req, res) {
       res.write(`event: load_end\ndata: {}\n\n`);
     } else {
       res.write(`event: full_reload\ndata: ${JSON.stringify(entriesToSend)}\n\n`);
+    }
+
+    // Compute KV-Cache content for latest MainAgent
+    for (let i = entries.length - 1; i >= 0; i--) {
+      if (isMainAgentEntry(entries[i])) {
+        const cached = extractCachedContent(entries[i]);
+        if (cached) {
+          res.write(`event: kv_cache_content\ndata: ${JSON.stringify(cached)}\n\n`);
+        }
+        break;
+      }
     }
 
     req.on('close', () => {

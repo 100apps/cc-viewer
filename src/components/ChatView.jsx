@@ -9,7 +9,7 @@ import GitChanges from './GitChanges';
 import GitDiffView from './GitDiffView';
 import { extractToolResultText, getModelInfo } from '../utils/helpers';
 import { isSystemText, classifyUserContent, isMainAgent } from '../utils/contentFilter';
-import { classifyRequest, formatRequestTag } from '../utils/requestType';
+import { classifyRequest, formatRequestTag, formatTeammateLabel } from '../utils/requestType';
 import { isMobile } from '../env';
 import { t } from '../i18n';
 import styles from './ChatView.module.css';
@@ -706,22 +706,26 @@ class ChatView extends React.Component {
     // 记录每个 timestamp 对应的最后一个 item index，用于滚动定位
     const tsItemMap = {};
 
-    // 收集 SubAgent entries（按 timestamp 排序）
+    // 收集 SubAgent 和 Teammate entries（按 timestamp 排序）
     const subAgentEntries = [];
     if (requests) {
       for (let i = 0; i < requests.length; i++) {
         const req = requests[i];
         if (!req.timestamp) continue;
         const cls = classifyRequest(req, requests[i + 1]);
-        if (cls.type === 'SubAgent') {
+        if (cls.type === 'SubAgent' || cls.type === 'Teammate') {
           const respContent = req.response?.body?.content;
           if (Array.isArray(respContent) && respContent.length > 0) {
             const subToolResultMap = buildToolResultMap(req.body?.messages || []).toolResultMap;
+            const isTeammateEntry = cls.type === 'Teammate';
             subAgentEntries.push({
               timestamp: req.timestamp,
               content: respContent,
               toolResultMap: subToolResultMap,
-              label: formatRequestTag(cls.type, cls.subType),
+              label: isTeammateEntry
+                ? formatTeammateLabel(cls.subType, req.body?.model)
+                : formatRequestTag(cls.type, cls.subType),
+              isTeammate: isTeammateEntry,
               requestIndex: i,
             });
           }
@@ -750,7 +754,7 @@ class ChatView extends React.Component {
           const sa = subAgentEntries[subIdx];
           if (sa.timestamp) tsItemMap[sa.timestamp] = allItems.length;
           allItems.push(
-            <ChatMessage key={`sub-chat-${subIdx}`} role="sub-agent-chat" content={sa.content} toolResultMap={sa.toolResultMap} label={sa.label} timestamp={sa.timestamp} collapseToolResults={collapseToolResults} expandThinking={expandThinking} requestIndex={sa.requestIndex} onViewRequest={onViewRequest} />
+            <ChatMessage key={`sub-chat-${subIdx}`} role="sub-agent-chat" content={sa.content} toolResultMap={sa.toolResultMap} label={sa.label} isTeammate={sa.isTeammate} timestamp={sa.timestamp} collapseToolResults={collapseToolResults} expandThinking={expandThinking} requestIndex={sa.requestIndex} onViewRequest={onViewRequest} />
           );
           subIdx++;
         }
@@ -765,7 +769,7 @@ class ChatView extends React.Component {
         if (nextSessionStart && sa.timestamp > nextSessionStart) break;
         if (sa.timestamp) tsItemMap[sa.timestamp] = allItems.length;
         allItems.push(
-          <ChatMessage key={`sub-chat-${subIdx}`} role="sub-agent-chat" content={sa.content} toolResultMap={sa.toolResultMap} label={sa.label} timestamp={sa.timestamp} collapseToolResults={collapseToolResults} expandThinking={expandThinking} requestIndex={sa.requestIndex} onViewRequest={onViewRequest} />
+          <ChatMessage key={`sub-chat-${subIdx}`} role="sub-agent-chat" content={sa.content} toolResultMap={sa.toolResultMap} label={sa.label} isTeammate={sa.isTeammate} timestamp={sa.timestamp} collapseToolResults={collapseToolResults} expandThinking={expandThinking} requestIndex={sa.requestIndex} onViewRequest={onViewRequest} />
         );
         subIdx++;
       }

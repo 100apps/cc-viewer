@@ -2,6 +2,8 @@ node_modules
 dist
 package-lock.json
 .claude/setting.local.json
+.claude/scheduled_tasks.lock
 .idea/
 .DS_Store
 .omc/
+tmp/

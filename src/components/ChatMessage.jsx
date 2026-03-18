@@ -14,6 +14,15 @@ import styles from './ChatMessage.module.css';
 
 const { Text } = Typography;
 
+function nameToColor(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = ((hash % 360) + 360) % 360;
+  return `hsl(${hue}, 55%, 35%)`;
+}
+
 class ChatMessage extends React.Component {
   constructor(props) {
     super(props);
@@ -789,6 +798,7 @@ class ChatMessage extends React.Component {
   }
 
   _getSubAvatarType() {
+    if (this.props.isTeammate) return 'teammate';
     const label = this.props.label || '';
     const match = label.match(/SubAgent:\s*(\w+)/i);
     const st = match ? match[1].toLowerCase() : '';
@@ -813,7 +823,7 @@ class ChatMessage extends React.Component {
           </div>
           {this.renderHighlightBubble(styles.bubbleAssistant, innerContent)}
         </div>
-        <div className={styles.avatar} style={{ background: 'rgba(255, 255, 255, 0.1)' }}
+        <div className={styles.avatar} style={{ background: this.props.isTeammate ? nameToColor(label || '') : 'rgba(255, 255, 255, 0.1)' }}
           dangerouslySetInnerHTML={{ __html: getSvgAvatar(this._getSubAvatarType()) }}
         />
       </div>
@@ -824,7 +834,7 @@ class ChatMessage extends React.Component {
     const { label, resultText, toolName, toolInput } = this.props;
     return (
       <div className={styles.messageRow}>
-        <div className={styles.avatar} style={{ background: 'rgba(255, 255, 255, 0.1)' }}
+        <div className={styles.avatar} style={{ background: this.props.isTeammate ? nameToColor(label || '') : 'rgba(255, 255, 255, 0.1)' }}
           dangerouslySetInnerHTML={{ __html: getSvgAvatar(this._getSubAvatarType()) }}
         />
         <div className={styles.contentCol}>
