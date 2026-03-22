@@ -123,7 +123,8 @@ class App extends React.Component {
     }
 
     // 获取用户偏好设置（包含 filterIrrelevant）
-    fetch(apiUrl('/api/preferences'))
+    // 用 Promise 保存，供 initSSE 等待（resume_prompt 需要知道 resumeAutoChoice）
+    this._prefsReady = fetch(apiUrl('/api/preferences'))
       .then(res => res.json())
       .then(data => {
         if (data.lang) {
@@ -145,8 +146,9 @@ class App extends React.Component {
         // filterIrrelevant 默认 true，showAll = !filterIrrelevant
         const filterIrrelevant = data.filterIrrelevant !== undefined ? !!data.filterIrrelevant : true;
         this.setState({ showAll: !filterIrrelevant });
+        return data;
       })
-      .catch(() => { });
+      .catch(() => ({}));
 
     // 获取系统用户头像和名字
     fetch(apiUrl('/api/user-profile'))
@@ -220,6 +222,31 @@ class App extends React.Component {
     if (this._autoSelectTimer) clearTimeout(this._autoSelectTimer);
     if (this._loadingCountTimer) cancelAnimationFrame(this._loadingCountTimer);
     if (this._cacheSaveTimer) clearTimeout(this._cacheSaveTimer);
+    if (this._sseTimeoutTimer) clearTimeout(this._sseTimeoutTimer);
+    if (this._sseReconnectTimer) clearTimeout(this._sseReconnectTimer);
+  }
+
+  // SSE 心跳超时检测：45s 内无任何事件则判定连接断开
+  _resetSSETimeout = () => {
+    if (this._sseTimeoutTimer) clearTimeout(this._sseTimeoutTimer);
+    this._sseReconnectCount = 0; // 收到事件说明连接正常，重置重连计数
+    this._sseTimeoutTimer = setTimeout(() => {
+      console.warn('SSE heartbeat timeout, reconnecting...');
+      this._reconnectSSE();
+    }, 45000);
+  };
+
+  _reconnectSSE() {
+    if (this._sseReconnectCount >= 10) {
+      console.error('SSE reconnect limit reached');
+      return;
+    }
+    this._sseReconnectCount = (this._sseReconnectCount || 0) + 1;
+    if (this.eventSource) { this.eventSource.close(); this.eventSource = null; }
+    if (this._flushRafId) { cancelAnimationFrame(this._flushRafId); this._flushRafId = null; }
+    this._pendingEntries = [];
+    if (this._sseReconnectTimer) clearTimeout(this._sseReconnectTimer);
+    this._sseReconnectTimer = setTimeout(() => { this.initSSE(); }, 2000);
   }
 
   animateLoadingCount(target, onDone) {
@@ -260,16 +287,20 @@ class App extends React.Component {
         this.setState({ fileLoading: true, fileLoadingCount: 0 });
       }
       this.eventSource = new EventSource(apiUrl(url));
-      this.eventSource.onmessage = (event) => this.handleEventMessage(event);
+      // 每次收到任何 SSE 事件（包括心跳注释帧触发的隐式活动）都重置超时
+      this.eventSource.onmessage = (event) => { this._resetSSETimeout(); this.handleEventMessage(event); };
+      this.eventSource.onopen = () => { this._resetSSETimeout(); };
       this.eventSource.addEventListener('resume_prompt', (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (this.state.resumeAutoChoice) {
-            // 用户偏好已启用，自动执行选择，跳过弹窗
-            this.handleResumeChoice(this.state.resumeAutoChoice);
-          } else {
-            this.setState({ resumeModalVisible: true, resumeFileName: data.recentFileName || '' });
-          }
+          // 等待偏好加载完成再判断是否跳过弹窗（避免竞态）
+          (this._prefsReady || Promise.resolve({})).then(() => {
+            if (this.state.resumeAutoChoice) {
+              this.handleResumeChoice(this.state.resumeAutoChoice);
+            } else {
+              this.setState({ resumeModalVisible: true, resumeFileName: data.recentFileName || '' });
+            }
+          });
         } catch { }
       });
       this.eventSource.addEventListener('resume_resolved', () => {
@@ -428,6 +459,7 @@ class App extends React.Component {
           console.error('Failed to parse kv_cache_content:', err);
         }
       });
+      this.eventSource.addEventListener('ping', () => { this._resetSSETimeout(); });
       this.eventSource.onerror = () => console.error('SSE连接错误');
     } catch (error) {
       console.error('EventSource初始化失败:', error);

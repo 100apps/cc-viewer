@@ -576,6 +576,12 @@ class DetailPanel extends React.Component {
           <div className={styles.tabContent} style={{ height: 'calc(100vh - 220px)', minHeight: 400 }}>
             {(() => {
               const cached = extractCachedContent([request]);
+              // 按请求 key 缓存最后一次有效的 token 值，避免同请求内闪烁且不串到别的请求
+              const reqKey = request.timestamp + '|' + request.url;
+              if (cached && (cached.cacheCreateTokens > 0 || cached.cacheReadTokens > 0)) {
+                this._lastCachedTokensKey = reqKey;
+                this._lastCachedTokens = { cacheCreateTokens: cached.cacheCreateTokens, cacheReadTokens: cached.cacheReadTokens };
+              }
               if (!cached || (cached.system.length === 0 && cached.messages.length === 0 && cached.tools.length === 0)) {
                 return <Empty description={t('ui.noCachedContent')} image={Empty.PRESENTED_IMAGE_SIMPLE} />;
               }
@@ -620,12 +626,15 @@ class DetailPanel extends React.Component {
               ) : null;
               return (
                 <div style={{ padding: '8px 0', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                  {(cached.cacheCreateTokens > 0 || cached.cacheReadTokens > 0 || userPromptNavList) && (
+                  {(() => {
+                    const hasTokens = cached.cacheCreateTokens > 0 || cached.cacheReadTokens > 0;
+                    const displayTokens = hasTokens ? cached : (this._lastCachedTokensKey === reqKey ? this._lastCachedTokens : null);
+                    return (displayTokens || userPromptNavList) ? (
                     <div style={{ display: 'flex', alignItems: 'center', fontSize: 12, fontFamily: 'monospace', color: '#aaa', marginBottom: 12, flexShrink: 0 }}>
-                      {(cached.cacheCreateTokens > 0 || cached.cacheReadTokens > 0) && <>
-                        {t('ui.tokens')}: <span style={{ color: '#faad14' }}>write {formatTokenCount(cached.cacheCreateTokens)}</span>
+                      {displayTokens && <>
+                        {t('ui.tokens')}: <span style={{ color: '#faad14' }}>write {formatTokenCount(displayTokens.cacheCreateTokens)}</span>
                         {' / '}
-                        <span style={{ color: '#52c41a' }}>read {formatTokenCount(cached.cacheReadTokens)}</span>
+                        <span style={{ color: '#52c41a' }}>read {formatTokenCount(displayTokens.cacheReadTokens)}</span>
                         <CopyOutlined
                           style={{ marginLeft: 8, cursor: 'pointer', color: '#888', transition: 'color 0.2s' }}
                           onClick={() => {
@@ -641,7 +650,8 @@ class DetailPanel extends React.Component {
                         </Popover>
                       )}
                     </div>
-                  )}
+                    ) : null;
+                  })()}
                   <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }} ref={el => { this._cacheScrollEl = el; }}>
                     {cached.system.length > 0 && (
                       <div style={{ marginBottom: 12 }}>

@@ -1,3 +1,5 @@
+// 客户端专用的i18n文件
+
 const i18nData = {
   "ui.guide.title": {
     "zh": "欢迎使用 CC Viewer",

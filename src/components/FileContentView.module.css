@@ -80,6 +80,28 @@
   font-size: 11px;
   color: #666;
   flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #3a3a3a;
+  background: #1a1a1a;
+  color: #888;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.closeBtn:hover {
+  background: #2a2a2a;
+  color: #fff;
+  border-color: #4a4a4a;
 }
 
 .saveBtn {

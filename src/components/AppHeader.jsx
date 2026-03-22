@@ -78,6 +78,7 @@ class AppHeader extends React.Component {
       nextProps.filterIrrelevant !== this.props.filterIrrelevant ||
       nextProps.cliMode !== this.props.cliMode ||
       nextProps.contextWindow !== this.props.contextWindow ||
+      nextProps.serverCachedContent !== this.props.serverCachedContent ||
       nextProps.resumeAutoChoice !== this.props.resumeAutoChoice ||
       nextState !== this.state
     );
@@ -478,6 +479,14 @@ class AppHeader extends React.Component {
     const { requests = [], serverCachedContent } = this.props;
     const cached = serverCachedContent || extractCachedContent(requests);
 
+    // 缓存最后一次有效的 token 显示值，避免闪烁
+    if (cached && (cached.cacheCreateTokens > 0 || cached.cacheReadTokens > 0)) {
+      this._lastCachedTokens = { cacheCreateTokens: cached.cacheCreateTokens, cacheReadTokens: cached.cacheReadTokens };
+    }
+    if (contextPercent > 0) {
+      this._lastContextPercent = contextPercent;
+    }
+
     if (!cached || (cached.system.length === 0 && cached.messages.length === 0 && cached.tools.length === 0)) {
       return <div className={styles.cachePopoverEmpty}>{t('ui.noCachedContent')}</div>;
     }
@@ -577,13 +586,17 @@ class AppHeader extends React.Component {
             />
           </div>
         </div>
-        {(cached.cacheCreateTokens > 0 || cached.cacheReadTokens > 0 || userPromptNavList) && (
+        {(() => {
+          const hasTokens = cached.cacheCreateTokens > 0 || cached.cacheReadTokens > 0;
+          const displayTokens = hasTokens ? cached : this._lastCachedTokens;
+          const displayCtx = contextPercent > 0 ? contextPercent : this._lastContextPercent || 0;
+          return (displayTokens || userPromptNavList) ? (
           <div className={styles.cacheTokenInfo}>
-            {(cached.cacheCreateTokens > 0 || cached.cacheReadTokens > 0) && <>
-              {t('ui.tokens')}: <span style={{ color: '#faad14' }}>write {formatTokenCount(cached.cacheCreateTokens)}</span>
+            {displayTokens && <>
+              {t('ui.tokens')}: <span style={{ color: '#faad14' }}>write {formatTokenCount(displayTokens.cacheCreateTokens)}</span>
               {' / '}
-              <span style={{ color: '#52c41a' }}>read {formatTokenCount(cached.cacheReadTokens)}</span>
-              {contextPercent > 0 && <span style={{ color: '#888', marginLeft: 6 }}>(ctx:{contextPercent}%)</span>}
+              <span style={{ color: '#52c41a' }}>read {formatTokenCount(displayTokens.cacheReadTokens)}</span>
+              {displayCtx > 0 && <span style={{ color: '#888', marginLeft: 6 }}>(ctx:{displayCtx}%)</span>}
             </>}
             {userPromptNavList && (
               <Popover content={userPromptNavList} trigger="hover" placement="left">
@@ -591,7 +604,8 @@ class AppHeader extends React.Component {
               </Popover>
             )}
           </div>
-        )}
+          ) : null;
+        })()}
         <div className={styles.cacheScrollArea} ref={el => {
           this._cacheScrollEl = el;
           if (el && !this._cacheScrollInited) {
@@ -1255,6 +1269,10 @@ class AppHeader extends React.Component {
                   }
                 }
               }
+            }
+            // 回退到最后一次有效值，避免闪烁
+            if (contextPercent === 0 && this._lastContextPercent > 0) {
+              contextPercent = this._lastContextPercent;
             }
             const ctxColor = contextPercent >= 80 ? '#ff4d4f' : contextPercent >= 60 ? '#faad14' : '#52c41a';
 

@@ -473,6 +473,9 @@ export default function FileContentView({ filePath, onClose, editorSession, scro
             </svg>
           </button>
           <span className={styles.filePath}>{filePath}</span>
+          {fileSize > 0 && (
+            <span className={styles.fileSize}>{formatFileSize(fileSize)}</span>
+          )}
         </div>
         <div className={styles.headerRight}>
           {saveStatusText && (
@@ -493,9 +496,11 @@ export default function FileContentView({ filePath, onClose, editorSession, scro
             </svg>
             {i18n('ui.save')}
           </button>
-          {fileSize > 0 && (
-            <span className={styles.fileSize}>{formatFileSize(fileSize)}</span>
-          )}
+          <button className={styles.closeBtn} onClick={onClose} title={i18n('ui.backToChat')}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
         </div>
       </div>
       <div className={styles.contentContainer}>

@@ -4,11 +4,12 @@ import { createConnection } from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync, watchFile, unwatchFile, statSync, readdirSync, renameSync, unlinkSync, openSync, readSync, closeSync, realpathSync, mkdirSync, createReadStream } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, extname } from 'node:path';
+import { dirname, join, extname, resolve } from 'node:path';
 import { homedir, platform, networkInterfaces } from 'node:os';
 import { execFile, exec, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Worker } from 'node:worker_threads';
+import { isPathContained, readFileContent, writeFileContent, resolveFilePath, ERROR_STATUS_MAP } from './lib/file-api.js';
 
 const execFileAsync = promisify(execFile);
 const execAsync = promisify(exec);
@@ -38,11 +39,14 @@ import { LOG_DIR } from './findcc.js';
 import { t, detectLanguage } from './i18n.js';
 import { checkAndUpdate } from './lib/updater.js';
 import { loadPlugins, runWaterfallHook, runParallelHook, getPluginsInfo, PLUGINS_DIR } from './lib/plugin-loader.js';
+import { uploadPlugins, installPluginFromUrl } from './lib/plugin-manager.js';
 import { getUserProfile } from './lib/user-profile.js';
 import { getGitDiffs } from './lib/git-diff.js';
 import { CONTEXT_WINDOW_FILE, readModelContextSize, buildContextWindowEvent, getContextSizeForModel } from './lib/context-watcher.js';
 import { readLogFile, watchLogFile, startWatching, getWatchedFiles } from './lib/log-watcher.js';
 import { isMainAgentEntry, extractCachedContent } from './lib/kv-cache-analyzer.js';
+import { listLocalLogs, readLocalLog, deleteLogFiles, mergeLogFiles } from './lib/log-management.js';
+import { detectTargetLang, translate } from './lib/translator.js';
 
 const PREFS_FILE = join(LOG_DIR, 'preferences.json');
 const isCliMode = process.env.CCV_CLI_MODE === '1';
@@ -389,29 +393,12 @@ async function handleRequest(req, res) {
         }
 
         // 确定目标语言
-        let targetLang = to;
-        if (!targetLang) {
-          try {
-            if (existsSync(PREFS_FILE)) {
-              const prefs = JSON.parse(readFileSync(PREFS_FILE, 'utf-8'));
-              if (prefs.lang) targetLang = prefs.lang;
-            }
-          } catch { }
-          if (!targetLang) targetLang = detectLanguage();
-        }
-
-        // 源语言与目标语言相同，直接返回
-        if (targetLang === from) {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ text, from, to: targetLang }));
-          return;
-        }
+        const targetLang = to || detectTargetLang(PREFS_FILE);
 
         // 获取 API Key（仅 x-api-key 认证，不复用 session token 避免上下文污染）
         // 优先级: 环境变量 > 拦截缓存 > 从 authHeader 中提取 sk- 开头的 key
         let apiKey = process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN || _cachedApiKey;
         if (!apiKey && _cachedAuthHeader) {
-          // Bearer sk-xxx 格式：提取实际的 API key
           const m = _cachedAuthHeader.match(/^Bearer\s+(sk-\S+)$/i);
           if (m) apiKey = m[1];
         }
@@ -421,53 +408,24 @@ async function handleRequest(req, res) {
           return;
         }
 
-        const baseUrl = process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com';
-        const inputText = Array.isArray(text) ? text.join('\n---SPLIT---\n') : text;
-
-        const reqHeaders = {
-          'Content-Type': 'application/json',
-          'anthropic-version': '2023-06-01',
-          'x-api-key': apiKey,
-          'x-cc-viewer-internal': '1',
-        };
-
-        const apiRes = await fetch(`${baseUrl}/v1/messages`, {
-          method: 'POST',
-          headers: reqHeaders,
-          body: JSON.stringify({
-            model: _cachedHaikuModel || 'claude-haiku-4-5-20251001',
-            max_tokens: 32000,
-            tools: [],
-            system: [{
-              type: "text",
-              text: `You are a translator. Translate the following text from ${from} to ${targetLang}. Output only the translated text, nothing else.`
-            }],
-            messages: [{ role: 'user', content: inputText }],
-            stream: false,
-            temperature: 1,
-          }),
+        const result = await translate({
+          text,
+          from,
+          to: targetLang,
+          apiKey,
+          baseUrl: process.env.ANTHROPIC_BASE_URL,
+          model: _cachedHaikuModel,
         });
 
-        if (!apiRes.ok) {
-          const errBody = await apiRes.text();
-          res.writeHead(502, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Translation API failed', status: apiRes.status, detail: errBody }));
-          return;
-        }
-
-        const apiData = await apiRes.json();
-        let translated = apiData.content?.[0]?.text || '';
-
-        // 如果输入是数组，拆分回数组
-        if (Array.isArray(text)) {
-          translated = translated.split(/\n?---SPLIT---\n?/);
-        }
-
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ text: translated, from, to: targetLang }));
+        res.end(JSON.stringify(result));
       } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Internal error', message: err.message }));
+        const status = err.status ? 502 : 500;
+        const payload = err.status
+          ? { error: 'Translation API failed', status: err.status, detail: err.detail }
+          : { error: 'Internal error', message: err.message };
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(payload));
       }
     });
     return;
@@ -655,6 +613,11 @@ async function handleRequest(req, res) {
 
     clients.push(res);
 
+    // SSE 心跳保活：每 30s 发送 ping 事件，防止连接被 OS/代理/浏览器静默断开
+    const pingTimer = setInterval(() => {
+      try { res.write('event: ping\ndata: {}\n\n'); } catch {}
+    }, 30000);
+
     // 如果有待决的 resume 选择，发送 resume_prompt 事件
     if (_resumeState) {
       res.write(`event: resume_prompt\ndata: ${JSON.stringify({ recentFileName: _resumeState.recentFileName })}\n\n`);
@@ -737,6 +700,7 @@ async function handleRequest(req, res) {
     }
 
     req.on('close', () => {
+      clearInterval(pingTimer);
       const idx = clients.indexOf(res);
       if (idx !== -1) clients.splice(idx, 1);
     });
@@ -1055,73 +1019,16 @@ async function handleRequest(req, res) {
   if (url === '/api/file-content' && method === 'GET') {
     const reqPath = parsedUrl.searchParams.get('path');
     const isEditorSession = parsedUrl.searchParams.get('editorSession') === 'true';
-    if (!reqPath) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Invalid path' }));
-      return;
-    }
-    // Allow absolute paths for editor sessions or when within project directory
-    if (!isEditorSession && (reqPath.startsWith('/') || reqPath.includes('..'))) {
-      const cwd = process.env.CCV_PROJECT_DIR || process.cwd();
-      if (reqPath.startsWith(cwd + '/')) {
-        // 绝对路径在项目目录内，自动转为相对路径继续处理
-        const relPath = reqPath.slice(cwd.length + 1);
-        const targetFile = join(cwd, relPath);
-        try {
-          if (!existsSync(targetFile)) {
-            res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: `File not found: ${targetFile}` }));
-            return;
-          }
-          const stat = statSync(targetFile);
-          if (!stat.isFile()) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Not a file' }));
-            return;
-          }
-          if (stat.size > 5 * 1024 * 1024) {
-            res.writeHead(413, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'File too large' }));
-            return;
-          }
-          const content = readFileSync(targetFile, 'utf-8');
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ path: relPath, content, size: stat.size }));
-        } catch (err) {
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: `Cannot read file: ${err.message}` }));
-        }
-        return;
-      }
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Invalid path' }));
-      return;
-    }
-    const targetFile = isEditorSession && reqPath.startsWith('/') ? reqPath : join(process.env.CCV_PROJECT_DIR || process.cwd(), reqPath);
+    const cwd = process.env.CCV_PROJECT_DIR || process.cwd();
     try {
-      if (!existsSync(targetFile)) {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: `File not found: ${targetFile}` }));
-        return;
-      }
-      const stat = statSync(targetFile);
-      if (!stat.isFile()) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Not a file' }));
-        return;
-      }
-      // 限制文件大小 5MB
-      if (stat.size > 5 * 1024 * 1024) {
-        res.writeHead(413, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'File too large' }));
-        return;
-      }
-      const content = readFileSync(targetFile, 'utf-8');
+      const result = readFileContent(cwd, reqPath, isEditorSession);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ path: reqPath, content, size: stat.size }));
+      res.end(JSON.stringify(result));
     } catch (err) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: `Cannot read file: ${err.message}` }));
+      const status = ERROR_STATUS_MAP[err.code] || 500;
+      const message = status === 500 ? `Cannot read file: ${err.message}` : err.message;
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: message }));
     }
     return;
   }
@@ -1130,22 +1037,9 @@ async function handleRequest(req, res) {
   if (url === '/api/file-raw' && (method === 'GET' || method === 'HEAD')) {
     const reqPath = parsedUrl.searchParams.get('path');
     const isEditorSession = parsedUrl.searchParams.get('editorSession') === 'true';
-    if (!reqPath) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Invalid path' }));
-      return;
-    }
-    if (!isEditorSession && (reqPath.startsWith('/') || reqPath.includes('..'))) {
-      // 允许项目目录内的绝对路径
-      const cwd = process.env.CCV_PROJECT_DIR || process.cwd();
-      if (!reqPath.startsWith(cwd + '/')) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Invalid path' }));
-        return;
-      }
-    }
-    const targetFile = (isEditorSession || reqPath.startsWith('/')) ? reqPath : join(process.env.CCV_PROJECT_DIR || process.cwd(), reqPath);
+    const cwd = process.env.CCV_PROJECT_DIR || process.cwd();
     try {
+      const targetFile = resolveFilePath(cwd, reqPath, isEditorSession);
       if (!existsSync(targetFile)) {
         res.writeHead(404, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: `File not found: ${targetFile}` }));
@@ -1174,8 +1068,10 @@ async function handleRequest(req, res) {
       res.writeHead(200, { 'Content-Type': mime, 'Content-Length': size });
       res.end(data);
     } catch (err) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: `Cannot read file: ${err.message}` }));
+      const status = ERROR_STATUS_MAP[err.code] || 500;
+      const message = status === 500 ? `Cannot read file: ${err.message}` : err.message;
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: message }));
     }
     return;
   }
@@ -1197,30 +1093,15 @@ async function handleRequest(req, res) {
       }
       try {
         const { path: reqPath, content, editorSession } = JSON.parse(body);
-        if (!reqPath) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Invalid path' }));
-          return;
-        }
-        // Allow absolute paths only for editor sessions
-        if (!editorSession && (reqPath.startsWith('/') || reqPath.includes('..'))) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Invalid path' }));
-          return;
-        }
-        if (typeof content !== 'string') {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Content must be a string' }));
-          return;
-        }
-        const targetFile = editorSession && reqPath.startsWith('/') ? reqPath : join(process.env.CCV_PROJECT_DIR || process.cwd(), reqPath);
-        writeFileSync(targetFile, content, 'utf-8');
-        const stat = statSync(targetFile);
+        const cwd = process.env.CCV_PROJECT_DIR || process.cwd();
+        const result = writeFileContent(cwd, reqPath, content, editorSession);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, size: stat.size }));
+        res.end(JSON.stringify({ ok: true, size: result.size }));
       } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: `Cannot save file: ${err.message}` }));
+        const status = ERROR_STATUS_MAP[err.code] || 500;
+        const message = status === 500 ? `Cannot save file: ${err.message}` : err.message;
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: message }));
       }
     });
     return;
@@ -1330,36 +1211,14 @@ async function handleRequest(req, res) {
     req.on('end', async () => {
       try {
         const { files: fileList } = JSON.parse(body);
-        if (!Array.isArray(fileList) || fileList.length === 0) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'No files provided' }));
-          return;
-        }
-        // 确保插件目录存在
-        if (!existsSync(PLUGINS_DIR)) {
-          mkdirSync(PLUGINS_DIR, { recursive: true });
-        }
-        for (const { name, content } of fileList) {
-          if (!name || typeof content !== 'string') continue;
-          const filename = name.replace(/.*[/\\]/, '');
-          if (!filename.endsWith('.js') && !filename.endsWith('.mjs')) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Only .js or .mjs files are allowed' }));
-            return;
-          }
-          if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Invalid file name' }));
-            return;
-          }
-          writeFileSync(join(PLUGINS_DIR, filename), content, 'utf-8');
-        }
+        uploadPlugins(PLUGINS_DIR, fileList);
         await loadPlugins();
         const plugins = getPluginsInfo();
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, plugins, pluginsDir: PLUGINS_DIR }));
       } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
+        const status = err.statusCode || 500;
+        res.writeHead(status, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: err.message }));
       }
     });
@@ -1372,90 +1231,15 @@ async function handleRequest(req, res) {
     req.on('end', async () => {
       try {
         const { url: fileUrl } = JSON.parse(body);
-        if (!fileUrl) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'URL is required' }));
-          return;
-        }
-        // 验证 URL 格式
-        let parsedUrl;
-        try {
-          parsedUrl = new URL(fileUrl);
-        } catch {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Invalid URL' }));
-          return;
-        }
-        if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Invalid URL' }));
-          return;
-        }
-        // 下载远程文件（限制 5MB，超时 30s）
-        const MAX_PLUGIN_SIZE = 5 * 1024 * 1024;
-        let content;
-        try {
-          const resp = await fetch(fileUrl, { signal: AbortSignal.timeout(30000) });
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const text = await resp.text();
-          if (text.length > MAX_PLUGIN_SIZE) throw new Error('File too large (max 5MB)');
-          content = text;
-        } catch (fetchErr) {
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Failed to fetch: ' + fetchErr.message }));
-          return;
-        }
-        // 通过子进程 import() 提取插件内部 name
-        let saveName = '';
-        const { tmpdir } = await import('node:os');
-        const tmpFile = join(tmpdir(), `ccv-install-${Date.now()}.mjs`);
-        writeFileSync(tmpFile, content, 'utf-8');
-        try {
-          const extractScript = join(__dirname, 'lib', 'extract-plugin-name.mjs');
-          const result = await new Promise((resolve, reject) => {
-            execFile('node', [extractScript, tmpFile], { timeout: 5000 }, (err, stdout) => {
-              if (err) return reject(err);
-              resolve(stdout);
-            });
-          });
-          const parsed = JSON.parse(result);
-          if (parsed.name) saveName = parsed.name;
-        } catch { }
-        try { unlinkSync(tmpFile); } catch { }
-        // fallback：从 URL 路径提取文件名，排除通用名称
-        if (!saveName) {
-          const urlFilename = parsedUrl.pathname.split('/').pop();
-          if (urlFilename && (urlFilename.endsWith('.js') || urlFilename.endsWith('.mjs'))
-              && urlFilename !== 'index.js' && urlFilename !== 'index.mjs') {
-            saveName = urlFilename.replace(/\.(js|mjs)$/, '');
-          }
-        }
-        // 最终 fallback：使用 plugin-<timestamp>
-        if (!saveName) {
-          saveName = `plugin-${Date.now()}`;
-        }
-        let filename = (saveName.endsWith('.js') || saveName.endsWith('.mjs')) ? saveName : saveName + '.js';
-        // 安全校验
-        if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-          filename = `plugin-${Date.now()}.js`;
-        }
-        // 确保插件目录存在
-        if (!existsSync(PLUGINS_DIR)) {
-          mkdirSync(PLUGINS_DIR, { recursive: true });
-        }
-        // 同名文件去重：追加唯一标识
-        if (existsSync(join(PLUGINS_DIR, filename))) {
-          const ext = filename.endsWith('.mjs') ? '.mjs' : '.js';
-          const base = filename.slice(0, -ext.length);
-          filename = `${base}-${Date.now()}${ext}`;
-        }
-        writeFileSync(join(PLUGINS_DIR, filename), content, 'utf-8');
+        const extractScript = join(__dirname, 'lib', 'extract-plugin-name.mjs');
+        await installPluginFromUrl(PLUGINS_DIR, fileUrl, extractScript);
         await loadPlugins();
         const plugins = getPluginsInfo();
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, plugins, pluginsDir: PLUGINS_DIR }));
       } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
+        const status = err.statusCode || 500;
+        res.writeHead(status, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: err.message }));
       }
     });
@@ -1475,40 +1259,9 @@ async function handleRequest(req, res) {
   // 列出本地日志文件（按项目分组，遍历项目子目录）
   if (url === '/api/local-logs' && method === 'GET') {
     try {
-      const grouped = {};
-      if (existsSync(LOG_DIR)) {
-        const entries = readdirSync(LOG_DIR, { withFileTypes: true });
-        for (const entry of entries) {
-          if (!entry.isDirectory()) continue;
-          const project = entry.name;
-          const projectDir = join(LOG_DIR, project);
-          const files = readdirSync(projectDir)
-            .filter(f => f.endsWith('.jsonl'))
-            .sort()
-            .reverse();
-          // 从项目统计缓存中读取 per-file 数据，避免逐文件扫描
-          let statsFiles = null;
-          try {
-            const statsFile = join(projectDir, `${project}.json`);
-            if (existsSync(statsFile)) {
-              statsFiles = JSON.parse(readFileSync(statsFile, 'utf-8')).files;
-            }
-          } catch { }
-          for (const f of files) {
-            const match = f.match(/^(.+?)_(\d{8}_\d{6})\.jsonl$/);
-            if (!match) continue;
-            const ts = match[2];
-            const filePath = join(projectDir, f);
-            const size = statSync(filePath).size;
-            if (size === 0) continue; // 跳过空文件
-            const turns = statsFiles?.[f]?.summary?.sessionCount || 0;
-            if (!grouped[project]) grouped[project] = [];
-            grouped[project].push({ file: `${project}/${f}`, timestamp: ts, size, turns, preview: statsFiles?.[f]?.preview || [] });
-          }
-        }
-      }
+      const result = listLocalLogs(LOG_DIR, _projectName);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ...grouped, _currentProject: _projectName || '' }));
+      res.end(JSON.stringify(result));
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message }));
@@ -1575,31 +1328,13 @@ async function handleRequest(req, res) {
       return;
     }
 
-    const filePath = join(LOG_DIR, file);
     try {
-      if (!existsSync(filePath)) {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'File not found' }));
-        return;
-      }
-
-      // 验证文件确实在 LOG_DIR 内（防止路径穿越）
-      const realPath = realpathSync(filePath);
-      const realLogDir = realpathSync(LOG_DIR);
-      if (!realPath.startsWith(realLogDir)) {
-        res.writeHead(403, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Access denied' }));
-        return;
-      }
-
-      const content = readFileSync(filePath, 'utf-8');
-      const entries = content.split('\n---\n').filter(line => line.trim()).map(entry => {
-        try { return JSON.parse(entry); } catch { return null; }
-      }).filter(Boolean);
+      const entries = readLocalLog(LOG_DIR, file);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(entries));
     } catch (err) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
+      const status = err.code === 'NOT_FOUND' ? 404 : err.code === 'ACCESS_DENIED' ? 403 : 500;
+      res.writeHead(status, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message }));
     }
     return;
@@ -1617,30 +1352,7 @@ async function handleRequest(req, res) {
           res.end(JSON.stringify({ error: 'No files specified' }));
           return;
         }
-        const results = [];
-        for (const file of files) {
-          if (!file || file.includes('..') || !file.endsWith('.jsonl')) {
-            results.push({ file, error: 'Invalid file name' });
-            continue;
-          }
-          const filePath = join(LOG_DIR, file);
-          try {
-            if (!existsSync(filePath)) {
-              results.push({ file, error: 'Not found' });
-              continue;
-            }
-            const realPath = realpathSync(filePath);
-            const realLogDir = realpathSync(LOG_DIR);
-            if (!realPath.startsWith(realLogDir)) {
-              results.push({ file, error: 'Access denied' });
-              continue;
-            }
-            unlinkSync(realPath);
-            results.push({ file, ok: true });
-          } catch (err) {
-            results.push({ file, error: err.message });
-          }
-        }
+        const results = deleteLogFiles(LOG_DIR, files);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ results }));
       } catch {
@@ -1658,55 +1370,12 @@ async function handleRequest(req, res) {
     req.on('end', () => {
       try {
         const { files } = JSON.parse(body);
-        if (!Array.isArray(files) || files.length < 2) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'At least 2 files required' }));
-          return;
-        }
-        // 校验所有文件属于同一 project
-        const projects = new Set(files.map(f => f.split('/')[0]));
-        if (projects.size !== 1) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'All files must belong to the same project' }));
-          return;
-        }
-        // 校验文件存在且无路径穿越
-        for (const f of files) {
-          if (f.includes('..')) {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: 'Invalid file path' }));
-            return;
-          }
-          if (!existsSync(join(LOG_DIR, f))) {
-            res.writeHead(404, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ error: `File not found: ${f}` }));
-            return;
-          }
-        }
-        // files 已按时间正序传入，校验合并后总大小不超过 300MB
-        const MAX_MERGE_SIZE = 300 * 1024 * 1024;
-        let totalSize = 0;
-        for (const f of files) {
-          totalSize += statSync(join(LOG_DIR, f)).size;
-        }
-        if (totalSize > MAX_MERGE_SIZE) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: `Merged size (${(totalSize / 1024 / 1024).toFixed(1)}MB) exceeds 300MB limit` }));
-          return;
-        }
-        // 合并内容写入第一个文件
-        const targetFile = files[0];
-        const targetPath = join(LOG_DIR, targetFile);
-        const contents = files.map(f => readFileSync(join(LOG_DIR, f), 'utf-8').trimEnd());
-        writeFileSync(targetPath, contents.join('\n---\n') + '\n');
-        // 删除其余文件
-        for (let i = 1; i < files.length; i++) {
-          unlinkSync(join(LOG_DIR, files[i]));
-        }
+        const merged = mergeLogFiles(LOG_DIR, files);
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, merged: targetFile }));
+        res.end(JSON.stringify({ ok: true, merged }));
       } catch (err) {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
+        const status = err.code === 'NOT_FOUND' ? 404 : err.code === 'INVALID_INPUT' ? 400 : 500;
+        res.writeHead(status, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: err.message }));
       }
     });

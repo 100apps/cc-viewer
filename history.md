@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.6.19 (2026-03-22)
+
+- Feature: SSE heartbeat keep-alive — server sends ping every 30s, client auto-reconnects on 45s timeout (up to 10 retries)
+- Feature: KV-Cache token display retains last valid values to prevent flickering on transient zero-token states
+- Feature: close button (×) added to file viewer and git diff viewer headers
+- Feature: file size display moved next to file path in file viewer header
+- Fix: resume auto-choice race condition — preferences now load before SSE resume_prompt is processed
+- Fix: KV-Cache token stats no longer leak across requests in DetailPanel (keyed by request timestamp)
+- Fix: AppHeader shouldComponentUpdate now includes serverCachedContent for proper SSE-driven re-renders
+- Security: path traversal fix in /api/file-content and /api/file-raw — uses realpathSync containment to block ".." escape and symlink bypass
+- Refactor: extract lib/log-management.js, lib/file-api.js, lib/translator.js, lib/plugin-manager.js from server.js (~350 lines reduction)
+
 ## 1.6.18 (2026-03-22)
 
 - Feature: user preferences section in Display Settings — "Default log resume behavior" with master switch and continue/new radio options
