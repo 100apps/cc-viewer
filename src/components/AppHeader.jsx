@@ -720,7 +720,7 @@ class AppHeader extends React.Component {
             <tbody>
               {subAgentEntries.map(([name, count]) => (
                 <tr key={name} className={styles.rowBorder}>
-                  <td className={styles.label}>{name}</td>
+                  <td className={styles.label}>{name} <ConceptHelp doc={`SubAgent-${name}`} /></td>
                   <td className={styles.td}>{count}</td>
                 </tr>
               ))}

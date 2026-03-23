@@ -116,7 +116,7 @@ export default function MobileStats({ requests = [], visible, onClose }) {
                   <tbody>
                     {subAgentEntries.map(([name, count]) => (
                       <tr key={name} className={headerStyles.rowBorder}>
-                        <td className={headerStyles.label}>{name}</td>
+                        <td className={headerStyles.label}>{name} <ConceptHelp doc={`SubAgent-${name}`} /></td>
                         <td className={headerStyles.td}>{count}</td>
                       </tr>
                     ))}
