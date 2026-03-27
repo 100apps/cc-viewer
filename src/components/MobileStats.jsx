@@ -80,7 +80,7 @@ export default function MobileStats({ requests = [], visible, onClose }) {
                 <table className={headerStyles.statsTable}>
                   <thead>
                     <tr>
-                      <td className={headerStyles.th} style={{ textAlign: 'left' }}>Skill</td>
+                      <td className={`${headerStyles.th} ${styles.thLeft}`}>Skill</td>
                       <td className={headerStyles.th}>{t('ui.cacheRebuild.count')}</td>
                     </tr>
                   </thead>
@@ -109,7 +109,7 @@ export default function MobileStats({ requests = [], visible, onClose }) {
                 <table className={headerStyles.statsTable}>
                   <thead>
                     <tr>
-                      <td className={headerStyles.th} style={{ textAlign: 'left' }}>SubAgent</td>
+                      <td className={`${headerStyles.th} ${styles.thLeft}`}>SubAgent</td>
                       <td className={headerStyles.th}>{t('ui.cacheRebuild.count')}</td>
                     </tr>
                   </thead>
@@ -138,7 +138,7 @@ export default function MobileStats({ requests = [], visible, onClose }) {
                 <table className={headerStyles.statsTable}>
                   <thead>
                     <tr>
-                      <td className={headerStyles.th} style={{ textAlign: 'left' }}>Name</td>
+                      <td className={`${headerStyles.th} ${styles.thLeft}`}>Name</td>
                       <td className={headerStyles.th}>{t('ui.cacheRebuild.count')}</td>
                     </tr>
                   </thead>
@@ -167,7 +167,7 @@ export default function MobileStats({ requests = [], visible, onClose }) {
                 <table className={headerStyles.statsTable}>
                   <thead>
                     <tr>
-                      <td className={headerStyles.th} style={{ textAlign: 'left' }}>Tool</td>
+                      <td className={`${headerStyles.th} ${styles.thLeft}`}>Tool</td>
                       <td className={headerStyles.th}>{t('ui.cacheRebuild.count')}</td>
                     </tr>
                   </thead>
@@ -195,13 +195,13 @@ export default function MobileStats({ requests = [], visible, onClose }) {
                 <div className={headerStyles.modelName}>MainAgent<ConceptHelp doc="MainAgent" /> {t('ui.cacheRebuildStats')}<ConceptHelp doc="CacheRebuild" /></div>
                 <table className={`${headerStyles.statsTable} ${styles.fixedTable}`}>
                   <colgroup>
-                    <col style={{ width: '50%' }} />
-                    <col style={{ width: '25%' }} />
-                    <col style={{ width: '25%' }} />
+                    <col className={styles.colWide} />
+                    <col className={styles.colNarrow} />
+                    <col className={styles.colNarrow} />
                   </colgroup>
                   <thead>
                     <tr>
-                      <td className={headerStyles.th} style={{ textAlign: 'left' }}>{t('ui.cacheRebuild.reason')}</td>
+                      <td className={`${headerStyles.th} ${styles.thLeft}`}>{t('ui.cacheRebuild.reason')}</td>
                       <td className={headerStyles.th}>{t('ui.cacheRebuild.count')}</td>
                       <td className={headerStyles.th}>{t('ui.cacheRebuild.cacheCreate')}</td>
                     </tr>

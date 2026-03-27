@@ -104,9 +104,9 @@ class RequestList extends React.Component {
                     {reqType === 'MainAgent'
                       ? <Tag color="orange" className={styles.tagNoMargin}>MainAgent</Tag>
                       : reqType === 'Plan'
-                        ? <Tag className={styles.tagNoMargin} style={{ color: '#a33', borderColor: '#a33', backgroundColor: '#000' }}>{formatRequestTag(reqType, subType)}</Tag>
+                        ? <Tag className={`${styles.tagNoMargin} ${styles.tagPlan}`}>{formatRequestTag(reqType, subType)}</Tag>
                         : reqType === 'Count' || reqType === 'Preflight'
-                          ? <Tag className={styles.tagNoMargin} style={{ color: '#666', borderColor: '#444', backgroundColor: '#000' }}>{reqType}</Tag>
+                          ? <Tag className={`${styles.tagNoMargin} ${styles.tagMuted}`}>{reqType}</Tag>
                           : <Tag className={styles.tagNoMargin}>{formatRequestTag(reqType, subType)}</Tag>
                     }
                     {model && <span className={styles.modelName} style={{ color: reqType === 'MainAgent' ? '#d4822d' : '#8c8c8c' }}>{model}</span>}
@@ -140,7 +140,7 @@ class RequestList extends React.Component {
                           if (loss) {
                             const allReasons = loss.reasons || [loss.reason];
                             const tooltipText = allReasons.map(r => t(reasonI18nMap[r] || reasonI18nMap.key_change)).join('\n');
-                            dot = <Tooltip title={<span style={{ whiteSpace: 'pre-line' }}>{tooltipText}</span>}><span className={`${styles.cacheDot} ${styles.cacheDotLoss}`} /></Tooltip>;
+                            dot = <Tooltip title={<span className={styles.tooltipPreLine}>{tooltipText}</span>}><span className={`${styles.cacheDot} ${styles.cacheDotLoss}`} /></Tooltip>;
                           } else {
                             dot = <span className={`${styles.cacheDot} ${styles.cacheDotNormal}`} />;
                           }

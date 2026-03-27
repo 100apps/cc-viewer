@@ -435,13 +435,13 @@ class DetailPanel extends React.Component {
             this._lastDiffResult = diffResult;
             diffBlock = (
               <div className={styles.diffSection}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div className={styles.diffHeaderRow}>
                   <Text strong className={styles.diffToggle}
                     onClick={() => this.setState(prev => ({ diffExpanded: !prev.diffExpanded }))}>
                     Body Diff JSON <ConceptHelp doc="BodyDiffJSON" />{' '}{this.state.diffExpanded ? <DownOutlined className={styles.diffIcon} /> : <RightOutlined className={styles.diffIcon} />}
                   </Text>
                   {this.state.diffExpanded && (
-                    <Space size="small" style={{ marginLeft: 'auto' }}>
+                    <Space size="small" className={styles.diffSpaceRight}>
                       <Button
                         size="small"
                         icon={this.state.bodyViewMode.diff === 'json' ? <FileTextOutlined /> : <CodeOutlined />}
@@ -499,8 +499,8 @@ class DetailPanel extends React.Component {
                 <Text strong className={styles.bodyLabel}>Body</Text>
                 <Space size="small">
                   {(hasClaudeMd || hasSkills) && (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      <span style={{ color: '#888', fontSize: 12, fontFamily: 'monospace' }}>system-reminder:</span>
+                    <span className={styles.reminderFilterWrapper}>
+                      <span className={styles.reminderLabel}>system-reminder:</span>
                       <Select
                         size="small"
                         className={styles.reminderSelect}
@@ -584,7 +584,7 @@ class DetailPanel extends React.Component {
         key: 'kv-cache-text',
         label: <span>KV-Cache-Text <ConceptHelp doc="KVCacheContent" /></span>,
         children: (
-          <div className={styles.tabContent} style={{ height: 'calc(100vh - 220px)', minHeight: 400 }}>
+          <div className={`${styles.tabContent} ${styles.cacheTabContent}`}>
             {(() => {
               const cached = extractCachedContent([request]);
               // 按请求 key 缓存最后一次有效的 token 值，避免同请求内闪烁且不串到别的请求
@@ -624,9 +624,9 @@ class DetailPanel extends React.Component {
                   return true;
                 });
               const userPromptNavList = userPrompts.length > 0 ? (
-                <div style={{ width: 600, maxHeight: 300, overflowY: 'auto' }}>
+                <div className={styles.userPromptList}>
                   {userPrompts.map(({ cleaned, msgIdx }) => (
-                    <div key={msgIdx} style={{ padding: '4px 8px', fontSize: 12, color: '#ccc', cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', borderRadius: 3 }}
+                    <div key={msgIdx} className={styles.userPromptItem}
                       onMouseEnter={e => { e.currentTarget.style.background = 'rgba(22,104,220,0.2)'; e.currentTarget.style.color = '#fff'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = '#ccc'; }}
                       onClick={() => this.scrollToCacheMsg(msgIdx)}>
@@ -636,19 +636,19 @@ class DetailPanel extends React.Component {
                 </div>
               ) : null;
               return (
-                <div style={{ padding: '8px 0', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <div className={styles.cacheContent}>
                   {(() => {
                     const hasTokens = cached.cacheCreateTokens > 0 || cached.cacheReadTokens > 0;
                     const displayTokens = hasTokens ? cached : (this._lastCachedTokensKey === reqKey ? this._lastCachedTokens : null);
                     return (displayTokens || userPromptNavList) ? (
-                    <div style={{ display: 'flex', alignItems: 'center', fontSize: 12, fontFamily: 'monospace', color: '#aaa', marginBottom: 12, flexShrink: 0 }}>
+                    <div className={styles.cacheTokenBar}>
                       {displayTokens && <>
-                        {t('ui.tokens')}: <span style={{ color: '#faad14' }}>write {formatTokenCount(displayTokens.cacheCreateTokens)}</span>
+                        {t('ui.tokens')}: <span className={styles.cacheTokenWrite}>write {formatTokenCount(displayTokens.cacheCreateTokens)}</span>
                         {' / '}
-                        <span style={{ color: '#52c41a' }}>read {formatTokenCount(displayTokens.cacheReadTokens)}</span>
+                        <span className={styles.cacheTokenRead}>read {formatTokenCount(displayTokens.cacheReadTokens)}</span>
                         <Tooltip title={t('ui.copyAllCacheText')}>
                           <CopyOutlined
-                            style={{ marginLeft: 8, cursor: 'pointer', color: '#888', transition: 'color 0.2s' }}
+                            className={styles.cacheCopyIcon}
                             onClick={() => {
                               navigator.clipboard.writeText(buildPlainText()).then(() => {
                                 message.success(t('ui.copied'));
@@ -659,39 +659,39 @@ class DetailPanel extends React.Component {
                       </>}
                       {userPromptNavList && (
                         <Popover content={userPromptNavList} trigger="hover" placement="left">
-                          <span style={{ marginLeft: 'auto', fontSize: 11, color: '#1668dc', cursor: 'pointer', border: '1px solid #1668dc', borderRadius: 3, padding: '1px 6px', whiteSpace: 'nowrap' }}>{t('ui.userPromptNav')}</span>
+                          <span className={styles.userPromptNavBtn}>{t('ui.userPromptNav')}</span>
                         </Popover>
                       )}
                     </div>
                     ) : null;
                   })()}
-                  <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }} ref={el => { this._cacheScrollEl = el; }}>
+                  <div className={styles.cacheScrollArea} ref={el => { this._cacheScrollEl = el; }}>
                     {cached.tools.length > 0 && (
-                      <div style={{ marginBottom: 12 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#e5e5e5', marginBottom: 6, cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 4 }} onClick={() => this.setState(prev => ({ cacheCollapsed: { ...prev.cacheCollapsed, tools: !prev.cacheCollapsed.tools } }))}>
-                          <span style={{ display: 'inline-block', transition: 'transform 0.2s', transform: this.state.cacheCollapsed.tools ? 'rotate(-90deg)' : 'rotate(0deg)', fontSize: 10 }}>▼</span>
+                      <div className={styles.cacheSectionBlock}>
+                        <div className={styles.cacheSectionHeader} onClick={() => this.setState(prev => ({ cacheCollapsed: { ...prev.cacheCollapsed, tools: !prev.cacheCollapsed.tools } }))}>
+                          <span className={styles.cacheCollapseArrow} style={{ transform: this.state.cacheCollapsed.tools ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▼</span>
                           {t('ui.tools')} ({cached.tools.length})
                         </div>
                         {!this.state.cacheCollapsed.tools && cached.tools.map((text, i) => (
-                          <pre key={i} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, lineHeight: 1.5, color: '#ccc', background: '#111', border: '1px solid #2a2a2a', borderRadius: 4, padding: 8, margin: '4px 0', fontFamily: 'Menlo, Monaco, monospace' }}>{text}</pre>
+                          <pre key={i} className={styles.cachePre}>{text}</pre>
                         ))}
                       </div>
                     )}
                     {cached.system.length > 0 && (
-                      <div style={{ marginBottom: 12 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#e5e5e5', marginBottom: 6, cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 4 }} onClick={() => this.setState(prev => ({ cacheCollapsed: { ...prev.cacheCollapsed, system: !prev.cacheCollapsed.system } }))}>
-                          <span style={{ display: 'inline-block', transition: 'transform 0.2s', transform: this.state.cacheCollapsed.system ? 'rotate(-90deg)' : 'rotate(0deg)', fontSize: 10 }}>▼</span>
+                      <div className={styles.cacheSectionBlock}>
+                        <div className={styles.cacheSectionHeader} onClick={() => this.setState(prev => ({ cacheCollapsed: { ...prev.cacheCollapsed, system: !prev.cacheCollapsed.system } }))}>
+                          <span className={styles.cacheCollapseArrow} style={{ transform: this.state.cacheCollapsed.system ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▼</span>
                           {t('ui.systemPrompt')} ({cached.system.length})
                         </div>
                         {!this.state.cacheCollapsed.system && cached.system.map((text, i) => (
-                          <pre key={i} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, lineHeight: 1.5, color: '#ccc', background: '#0d1b2a', border: '1px solid #1b3a5c', borderRadius: 4, padding: 8, margin: '4px 0', fontFamily: 'Menlo, Monaco, monospace' }}>{text}</pre>
+                          <pre key={i} className={styles.cachePreSystem}>{text}</pre>
                         ))}
                       </div>
                     )}
                     {cached.messages.length > 0 && (
-                      <div style={{ marginBottom: 12 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#e5e5e5', marginBottom: 6, cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 4 }} onClick={() => this.setState(prev => ({ cacheCollapsed: { ...prev.cacheCollapsed, messages: !prev.cacheCollapsed.messages } }))}>
-                          <span style={{ display: 'inline-block', transition: 'transform 0.2s', transform: this.state.cacheCollapsed.messages ? 'rotate(-90deg)' : 'rotate(0deg)', fontSize: 10 }}>▼</span>
+                      <div className={styles.cacheSectionBlock}>
+                        <div className={styles.cacheSectionHeader} onClick={() => this.setState(prev => ({ cacheCollapsed: { ...prev.cacheCollapsed, messages: !prev.cacheCollapsed.messages } }))}>
+                          <span className={styles.cacheCollapseArrow} style={{ transform: this.state.cacheCollapsed.messages ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▼</span>
                           {t('ui.messages')} ({cached.messages.length})
                         </div>
                         {!this.state.cacheCollapsed.messages && cached.messages.map((text, i) => {
@@ -702,7 +702,7 @@ class DetailPanel extends React.Component {
                               : { boxShadow: '0 0 10px rgba(22,104,220,0.6)', transition: 'box-shadow 0.2s ease-in', position: 'relative' })
                             : {};
                           return (
-                            <pre key={i} data-msg-idx={i} style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12, lineHeight: 1.5, color: '#ccc', background: '#111', border: '1px solid #2a2a2a', borderRadius: 4, padding: 8, margin: '4px 0', fontFamily: 'Menlo, Monaco, monospace', ...hlStyle }}>
+                            <pre key={i} data-msg-idx={i} className={styles.cachePre} style={hlStyle}>
                               {isHl && (
                                 <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible', opacity: this.state.cacheHighlightFading ? 0 : 1, transition: this.state.cacheHighlightFading ? 'opacity 3s ease-out' : undefined }} preserveAspectRatio="none">
                                   <rect x="0.5" y="0.5" width="calc(100% - 1px)" height="calc(100% - 1px)" rx="4" ry="4"
@@ -728,7 +728,7 @@ class DetailPanel extends React.Component {
         key: 'context',
         label: 'Context',
         children: (
-          <div className={styles.tabContent} style={{ height: 'calc(100vh - 220px)', minHeight: 400 }}>
+          <div className={`${styles.tabContent} ${styles.cacheTabContent}`}>
             <ContextTab body={request.body} response={request.response?.body} />
           </div>
         ),

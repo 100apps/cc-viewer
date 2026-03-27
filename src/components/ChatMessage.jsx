@@ -19,13 +19,13 @@ const { Text } = Typography;
 function ChatImage({ src, alt, fallbackText }) {
   const [failed, setFailed] = React.useState(false);
   if (failed) {
-    return <span style={{ color: '#888', fontSize: 12 }}>{fallbackText}</span>;
+    return <span className={styles.chatImageFallback}>{fallbackText}</span>;
   }
   return (
     <img
       src={src}
       alt={alt}
-      style={{ maxWidth: '100%', maxHeight: 300, borderRadius: 6, margin: '6px 0', display: 'block', cursor: 'pointer' }}
+      className={styles.chatImageImg}
       onClick={() => window.open(src, '_blank')}
       onError={() => setFailed(true)}
     />
@@ -523,7 +523,7 @@ class ChatMessage extends React.Component {
     const cls = `${bubbleClass}${highlight === 'active' ? ' ' + styles.bubbleHighlight : ''}${highlight === 'fading' ? ' ' + styles.bubbleHighlightFading : ''}`;
     const isUser = bubbleClass === styles.bubbleUser;
     return (
-      <div className={cls} style={{ position: 'relative' }}>
+      <div className={`${cls} ${styles.bubbleRelative}`}>
         {(highlight === 'active' || highlight === 'fading') && (
           <svg className={`${styles.borderSvg}${highlight === 'fading' ? ' ' + styles.borderSvgFading : ''}`} preserveAspectRatio="none">
             <rect x="0.5" y="0.5" width="calc(100% - 1px)" height="calc(100% - 1px)" rx="8" ry="8"
@@ -802,7 +802,7 @@ class ChatMessage extends React.Component {
     const timeStr = this.formatTime(timestamp);
     return (
       <div className={styles.messageRow}>
-        <div style={{ width: 32, flexShrink: 0 }} />
+        <div className={styles.skillSpacer} />
         <div className={styles.contentCol}>
           <Collapse
             ghost
@@ -812,7 +812,7 @@ class ChatMessage extends React.Component {
               label: (
                 <span className={styles.skillLabel}>
                   📦 {t('ui.skillLoaded')}: {skillName}
-                  {timeStr && <Text className={styles.timeTextNoMargin} style={{ marginLeft: 8 }}>{timeStr}</Text>}
+                  {timeStr && <Text className={`${styles.timeTextNoMargin} ${styles.skillTimeIndent}`}>{timeStr}</Text>}
                 </span>
               ),
               children: <div className="chat-md" dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }} />,

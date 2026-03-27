@@ -65,7 +65,7 @@
 }
 
 .changeItem:hover {
-  background: #1a1a1a;
+  background: #1e1e1e;
 }
 
 .changeItem.changeItemSelected {
@@ -138,4 +138,8 @@
   font-size: 12px;
   padding: 8px 12px;
   text-align: center;
+}
+
+.rotated90 {
+  transform: rotate(90deg);
 }

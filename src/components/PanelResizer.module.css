@@ -1,7 +1,7 @@
 .resizer {
   width: 6px;
   cursor: col-resize;
-  background: #1f1f1f;
+  background: #1e1e1e;
   flex-shrink: 0;
   transition: background 0.2s;
 }

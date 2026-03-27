@@ -67,7 +67,7 @@
 }
 
 .treeItem:hover {
-  background: #1a1a1a;
+  background: #1e1e1e;
 }
 
 .treeItem.treeItemSelected {
@@ -101,7 +101,7 @@
 .fileNameInput {
   background: transparent;
   border: none;
-  border-bottom: 1px solid #528bff;
+  border-bottom: 1px solid #4a9eff;
   color: #ccc;
   font-size: 13px;
   font-family: inherit;
@@ -128,4 +128,8 @@
 
 .treeItemGitIgnored {
   opacity: 0.4;
+}
+
+.arrowIcon {
+  transition: transform 0.15s;
 }

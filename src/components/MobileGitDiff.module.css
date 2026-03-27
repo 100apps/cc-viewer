@@ -36,7 +36,7 @@
 .fileCount {
   font-size: 10px;
   color: #555;
-  background: #1a1a1a;
+  background: #1e1e1e;
   padding: 1px 6px;
   border-radius: 8px;
 }
@@ -62,16 +62,16 @@
 }
 
 .changeItem:hover {
-  background: #1a1a1a;
+  background: #1e1e1e;
 }
 
 .changeItemActive {
-  background: rgba(74, 158, 255, 0.12);
+  background: #4a9eff1f;
   color: #fff;
 }
 
 .changeItemActive:hover {
-  background: rgba(74, 158, 255, 0.18);
+  background: #4a9eff2e;
 }
 
 .dirItem {
@@ -212,4 +212,17 @@
   font-size: 13px;
   text-align: center;
   gap: 8px;
+}
+
+.fileSizeNote {
+  color: #888;
+  font-size: 12px;
+}
+
+.statusTextItalic {
+  font-style: italic;
+}
+
+.rotated90 {
+  transform: rotate(90deg);
 }

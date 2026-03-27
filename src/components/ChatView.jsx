@@ -74,6 +74,9 @@ function extractTeamSessions(requests) {
       const name = block.name;
       const input = typeof block.input === 'string' ? (() => { try { return JSON.parse(block.input); } catch { return {}; } })() : (block.input || {});
       if (name === 'TeamCreate') {
+        // 检查 TeamCreate 是否成功（tool_result 中不能有错误标记）
+        const createResult = findToolResult(block.id, i);
+        if (createResult && (createResult.includes('"error"') || createResult.includes('Already leading team'))) continue;
         const teamName = input.team_name || input.teamName || 'unknown';
         const ts = req.timestamp || req.response?.timestamp;
         const team = { name: teamName, startTime: ts, endTime: null, requestIndex: i, endRequestIndex: null, taskCount: 0, teammateCount: 0, _teammates: new Set() };
@@ -1775,7 +1778,7 @@ class ChatView extends React.Component {
           const statusColor = team.endTime ? '#52c41a' : '#faad14';
           return (
             <div key={i} className={styles.teamPopoverItem} onClick={() => this.setState({ teamModalSession: team })}>
-              <span style={{ color: statusColor, marginRight: 6, fontSize: 10 }}>{status}</span>
+              <span className={styles.teamPopoverStatus} style={{ color: statusColor }}>{status}</span>
               <span className={styles.teamPopoverName}>{team.name}</span>
               <span className={styles.teamPopoverMeta}>{team.teammateCount}p · {team.taskCount}t</span>
               <span className={styles.teamPopoverTime}>{time}</span>
@@ -1786,8 +1789,8 @@ class ChatView extends React.Component {
     );
     const hasActiveTeam = teamSessions.some(s => !s.endTime);
     return (
-      <Popover content={content} trigger="hover" placement="rightTop" overlayInnerStyle={{ background: '#1a1a1a', border: '1px solid #333', padding: 0 }}>
-        <button className={styles.navBtn} title={t('ui.teamSessions')} style={{ position: 'relative' }}>
+      <Popover content={content} trigger="hover" placement="rightTop" overlayInnerStyle={{ background: '#1e1e1e', border: '1px solid #333', padding: 0 }}>
+        <button className={`${styles.navBtn} ${styles.teamBtnRelative}`} title={t('ui.teamSessions')}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
             <circle cx="9" cy="7" r="4"/>
@@ -1863,7 +1866,7 @@ class ChatView extends React.Component {
           <div className={styles.teamGanttWrap}>
             {/* team-lead 行：分段显示活动 */}
             <div className={styles.teamGanttRow}>
-              <div className={styles.teamGanttLabel} style={{ color: '#196ae1', fontWeight: 600 }}>team-lead</div>
+              <div className={`${styles.teamGanttLabel} ${styles.ganttLabelLead}`}>team-lead</div>
               <div className={styles.teamGanttTrack}>
                 {leadSegments && leadSegments.map((seg, i) => {
                   const bgColor = seg.label === 'thinking' ? '#722ed1' : seg.label === 'report-received' ? '#52c41a' : '#196ae1';
@@ -1883,7 +1886,7 @@ class ChatView extends React.Component {
             {/* 各 agent 行：按事件节点分段显示 */}
             {teamAgents.map((ag, i) => (
               <div key={i} className={styles.teamGanttRow}>
-                <div className={styles.teamGanttLabel} style={{ color: '#eee' }}>{ag.name}</div>
+                <div className={`${styles.teamGanttLabel} ${styles.ganttLabelAgent}`}>{ag.name}</div>
                 <div className={styles.teamGanttTrack}>
                   {ag.segments.map((seg, si) => {
                     const isTool = seg.label.startsWith('tool:');
@@ -1897,17 +1900,17 @@ class ChatView extends React.Component {
                   {ag.events.filter(ev => !ev.label.startsWith('tool:')).map((ev, ei) => {
                     const tips = { spawn: 'Agent Spawned', claim: 'Task Claimed', done: 'Task Completed', shutdown: 'Shutdown Request', 'msg-in': 'Message Received', report: 'Report Submitted' };
                     const tip = tips[ev.label] || ev.label;
-                    return <Tooltip key={`d${ei}`} title={`${ag.name}: ${tip}`}><span className={styles.teamGanttDiamond} style={{ left: pct(ev.ts) + '%', color: '#eee' }}>◆</span></Tooltip>;
+                    return <Tooltip key={`d${ei}`} title={`${ag.name}: ${tip}`}><span className={`${styles.teamGanttDiamond} ${styles.ganttLabelAgent}`} style={{ left: pct(ev.ts) + '%' }}>◆</span></Tooltip>;
                   })}
                 </div>
               </div>
             ))}
             {/* 时间轴 */}
-            <div className={styles.teamGanttRow} style={{ marginTop: 2 }}>
+            <div className={`${styles.teamGanttRow} ${styles.ganttTimeAxisRow}`}>
               <div className={styles.teamGanttLabel} />
-              <div className={styles.teamGanttTrack} style={{ background: 'transparent', height: 16, position: 'relative' }}>
+              <div className={`${styles.teamGanttTrack} ${styles.ganttTimeAxisTrack}`}>
                 {ticks.map((tk, i) => (
-                  <span key={i} style={{ position: 'absolute', left: tk.pct + '%', transform: 'translateX(-50%)', fontSize: 9, color: '#555', whiteSpace: 'nowrap' }}>{tk.label}</span>
+                  <span key={i} className={styles.ganttTickLabel} style={{ left: tk.pct + '%' }}>{tk.label}</span>
                 ))}
               </div>
             </div>
@@ -1953,7 +1956,7 @@ class ChatView extends React.Component {
               );
             })()}
             {/* 滚动位置指示线 — 跨越所有 track 行 */}
-            <div ref={this._ganttIndicatorRef} className={styles.teamGanttIndicator} style={{ left: '110px' }} />
+            <div ref={this._ganttIndicatorRef} className={`${styles.teamGanttIndicator} ${styles.ganttIndicatorInitial}`} />
           </div>
         )}
       </div>
@@ -2347,7 +2350,7 @@ class ChatView extends React.Component {
         maskClosable
         zIndex={1100}
         width="calc(100vw - 80px)"
-        title={<span style={{ color: '#e5e5e5', fontSize: 15 }}>Team: {team.name}</span>}
+        title={<span className={styles.teamModalTitle}>Team: {team.name}</span>}
         styles={{
           header: { background: '#111', borderBottom: '1px solid #2a2a2a', padding: '12px 20px' },
           body: { background: '#0a0a0a', height: 'calc(100vh - 160px)', overflow: 'hidden', padding: 0 },
@@ -2359,7 +2362,7 @@ class ChatView extends React.Component {
         <div className={styles.teamModalLayout}>
           {/* Left: Agent Cards */}
           <div className={styles.teamAgentCards}>
-            <div className={styles.teamAgentCard} style={{ borderLeftColor: '#196ae1' }}>
+            <div className={`${styles.teamAgentCard} ${styles.teamLeadCard}`}>
               <div className={styles.teamAgentCardHeader}>
                 {modelInfo?.svg
                   ? <div className={styles.teamAgentAvatar} style={{ background: modelInfo.color || '#6b21a8' }} dangerouslySetInnerHTML={{ __html: modelInfo.svg }} />
@@ -2396,22 +2399,22 @@ class ChatView extends React.Component {
                     const texts = (msg.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
                     if (!texts.trim()) return null;
                     return <div key={mi} className={`${styles.teamAgentPopMsg} chat-md`} dangerouslySetInnerHTML={{ __html: renderMarkdown(texts.length > 2000 ? texts.slice(0, 2000) + '\n\n...' : texts) }} />;
-                  }) : <div style={{ color: '#666', fontSize: 12 }}>No messages</div>}
+                  }) : <div className={styles.agentNoMessages}>No messages</div>}
                 </div>
               );
               return (
-                <Popover key={i} content={popContent} trigger="click" placement="rightTop" arrow={{ pointAtCenter: true }}
-                  overlayInnerStyle={{ background: '#1a1a1a', border: '1px solid #333', padding: 0, maxWidth: 800, maxHeight: '80vh', overflowY: 'auto' }}
+                <Popover key={i} content={popContent} trigger="click" placement="right" autoAdjustOverflow
+                  overlayInnerStyle={{ background: '#1e1e1e', border: '1px solid #333', padding: 0, maxWidth: 800, maxHeight: '70vh', overflowY: 'auto' }}
                   onOpenChange={(open) => this.setState({ activeAgentCard: open ? i : null })}
                 >
-                  <div className={`${styles.teamAgentCard} ${this.state.activeAgentCard === i ? styles.teamAgentCardActive : ''}`} style={{ borderLeftColor: '#eee', cursor: 'pointer' }}>
+                  <div className={`${styles.teamAgentCard} ${styles.teamAgentCardClickable} ${this.state.activeAgentCard === i ? styles.teamAgentCardActive : ''}`}>
                     <div className={styles.teamAgentCardHeader}>
                       <div className={styles.teamAgentAvatar} style={{ background: nameToColor(ag.name) }} dangerouslySetInnerHTML={{ __html: getSvgAvatar('teammate') }} />
                       <div className={styles.teamAgentName}>{ag.name}</div>
                     </div>
                     <div className={styles.teamAgentType}>{ag.type}</div>
                     <div className={styles.teamAgentStatus} style={{ color: isDone ? '#52c41a' : '#faad14' }}>
-                      {isDone ? '✓ done' : '● working'} · {durStr}
+                      {isDone ? '✓ done' : '● working'} <span className={styles.agentStatusDurSuffix}>· {durStr}</span>
                     </div>
                   </div>
                 </Popover>
@@ -2682,7 +2685,7 @@ class ChatView extends React.Component {
             </button>
           {this.renderTeamButton()}
           </div>
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div className={styles.navSidebarContent}>
             {messageList}
           </div>
         </div>
@@ -2725,7 +2728,7 @@ class ChatView extends React.Component {
           </button>
           {this.renderTeamButton()}
         </div>
-        <div style={{ flex: 1, display: 'flex', minWidth: 0, position: 'relative' }} ref={this.innerSplitRef}>
+        <div className={styles.innerSplitArea} ref={this.innerSplitRef}>
           {/* 吸附预览框 */}
           {this.state.isDragging && this.state.activeSnapLine && (() => {
             const container = this.innerSplitRef.current;
@@ -2793,10 +2796,10 @@ class ChatView extends React.Component {
               onFileClick={(path) => this.setState({ currentGitDiff: path, currentFile: null })}
             />
           )}
-          <div className={styles.chatSection} style={{ flex: 1, minWidth: 0, display: 'flex' }}>
-            <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+          <div className={styles.chatSection}>
+            <div className={styles.chatSectionFlex}>
             {this.state.currentGitDiff && (
-              <div style={{ position: 'absolute', inset: 0, zIndex: 1, display: 'flex', flexDirection: 'column' }}>
+              <div className={styles.overlayPanel}>
                 <GitDiffView
                   filePath={this.state.currentGitDiff}
                   onClose={() => this.setState({ currentGitDiff: null })}
@@ -2824,7 +2827,7 @@ class ChatView extends React.Component {
               </div>
             )}
             {this.state.currentFile && (
-              <div style={{ position: 'absolute', inset: 0, zIndex: 1, display: 'flex', flexDirection: 'column' }}>
+              <div className={styles.overlayPanel}>
                 {isImageFile(this.state.currentFile) ? (
                   <ImageViewer
                     key={this.state.fileVersion}
@@ -2955,7 +2958,7 @@ class ChatView extends React.Component {
           {terminalVisible && (
             <>
               <div className={styles.vResizer} onMouseDown={this.handleSplitMouseDown} />
-              <div style={{ width: terminalWidth, flexShrink: 0, minWidth: 200, display: 'flex', flexDirection: 'column' }}>
+              <div className={styles.terminalPanelWrap} style={{ width: terminalWidth }}>
                 <TerminalPanel onEditorOpen={(sessionId, filePath) => {
                   this.setState({
                     editorSessionId: sessionId,

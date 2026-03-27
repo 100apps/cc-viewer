@@ -66,7 +66,7 @@ function TreeDir({ name, node, depth, selectedFile, onFileClick }) {
       {name && (
         <div className={styles.dirItem} style={{ paddingLeft: 8 + depth * 16 }}>
           <span className={styles.dirArrow}>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'rotate(90deg)' }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={styles.rotated90}>
               <polyline points="9 6 15 12 9 18"/>
             </svg>
           </span>
@@ -198,12 +198,12 @@ export default function MobileGitDiff({ visible }) {
                   {diffData.is_large ? (
                     <div className={styles.warningText}>
                       <p>{t('ui.largeFileWarning')}</p>
-                      <p style={{ color: '#888', fontSize: 12 }}>
+                      <p className={styles.fileSizeNote}>
                         {t('ui.fileSize')}: {(diffData.size / (1024 * 1024)).toFixed(2)} MB
                       </p>
                     </div>
                   ) : diffData.is_binary ? (
-                    <div className={styles.statusText} style={{ fontStyle: 'italic' }}>{t('ui.binaryFileNotice')}</div>
+                    <div className={`${styles.statusText} ${styles.statusTextItalic}`}>{t('ui.binaryFileNotice')}</div>
                   ) : (
                     <FullFileDiffView
                       file_path={selectedFile}

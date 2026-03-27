@@ -19,8 +19,8 @@
 
 .addedBadge {
   padding: 2px 8px;
-  background: rgba(115, 201, 145, 0.15);
-  border: 1px solid rgba(115, 201, 145, 0.3);
+  background: #73c99126;
+  border: 1px solid #73c9914d;
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
@@ -30,8 +30,8 @@
 
 .deletedBadge {
   padding: 2px 8px;
-  background: rgba(241, 76, 76, 0.15);
-  border: 1px solid rgba(241, 76, 76, 0.3);
+  background: #f14c4c26;
+  border: 1px solid #f14c4c4d;
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
@@ -130,7 +130,7 @@
 }
 
 .codeLine:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: #ffffff08;
 }
 
 .linePrefix {
@@ -153,7 +153,7 @@
 }
 
 .lineAdd {
-  background: rgba(115, 201, 145, 0.1);
+  background: #73c9911a;
 }
 
 .lineAdd .linePrefix {
@@ -161,7 +161,7 @@
 }
 
 .lineDelete {
-  background: rgba(241, 76, 76, 0.1);
+  background: #f14c4c1a;
 }
 
 .lineDelete .linePrefix {

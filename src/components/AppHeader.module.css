@@ -328,7 +328,7 @@
 /* Collapse for system-reminder segments */
 .systemCollapse {
   margin: 4px 0;
-  background: #1a1a1a;
+  background: #1e1e1e;
   border: 1px solid #303030;
   border-radius: 6px;
 }
@@ -472,7 +472,7 @@
   cursor: pointer;
   padding: 1px 4px;
   border-radius: 3px;
-  background: #1a1a1a;
+  background: #1e1e1e;
 }
 
 .pluginDirPath:hover {
@@ -527,7 +527,7 @@
   padding: 0 5px;
   border-radius: 3px;
   background: #1e3a5f;
-  color: #6cb6ff;
+  color: #60a5fa;
   line-height: 18px;
 }
 
@@ -628,8 +628,8 @@
   font-size: 12px;
   line-height: 1.5;
   color: #ccc;
-  background: #0d1b2a;
-  border: 1px solid #1b3a5c;
+  background: #060f2a;
+  border: 1px solid #0b2a5c;
   border-radius: 4px;
   padding: 8px;
   margin: 4px 0;
@@ -648,7 +648,7 @@
 }
 
 .cacheNavBtn:hover {
-  background: rgba(22, 104, 220, 0.15);
+  background: #1668dc26;
 }
 
 .cacheNavList {
@@ -669,17 +669,17 @@
 }
 
 .cacheNavItem:hover {
-  background: rgba(22, 104, 220, 0.2);
+  background: #1668dc33;
   color: #fff;
 }
 
 .cacheBlockHighlight {
-  box-shadow: 0 0 10px rgba(22, 104, 220, 0.6);
+  box-shadow: 0 0 10px #1668dc99;
   transition: box-shadow 0.2s ease-in;
 }
 
 .cacheBlockHighlightFading {
-  box-shadow: 0 0 10px rgba(22, 104, 220, 0);
+  box-shadow: 0 0 10px #1668dc00;
   transition: box-shadow 3s ease-out;
 }
 
@@ -704,5 +704,132 @@
 @keyframes cacheDashRotate {
   0% { stroke-dashoffset: 0; }
   100% { stroke-dashoffset: -100; }
+}
+
+/* th with left alignment override */
+.thLeft {
+  text-align: left;
+}
+
+/* Cache popover calibration model label */
+.cacheCalibrationLabel {
+  margin-left: auto;
+  color: #888;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Calibration model select */
+.calibrationSelect {
+  width: 160px;
+  flex-shrink: 0;
+}
+
+/* Cache popover lazy-load placeholder */
+.cachePopoverPlaceholder {
+  min-width: 300px;
+}
+
+/* Cache token colors */
+.cacheWriteToken {
+  color: #faad14;
+}
+
+.cacheReadToken {
+  color: #52c41a;
+}
+
+.cacheCtxPercent {
+  color: #888;
+  margin-left: 6px;
+}
+
+/* Plugin modal footer */
+.pluginModalFooter {
+  display: flex;
+  justify-content: space-between;
+}
+
+.pluginModalFooterLeft {
+  display: flex;
+  gap: 8px;
+}
+
+/* Plugin dir label */
+.pluginDirLabel {
+  color: #888;
+}
+
+/* Plugin empty state */
+.pluginEmptyTitle {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.pluginEmptyHint {
+  font-size: 12px;
+  color: #666;
+}
+
+/* CDN install modal */
+.cdnUrlLabel {
+  margin-bottom: 6px;
+  color: #ccc;
+  font-size: 13px;
+}
+
+.cdnInput {
+  background: #1e1e1e;
+  border-color: #333;
+  color: #eee;
+}
+
+/* Icon with marginRight in drawer/modal titles */
+.titleIcon {
+  margin-right: 8px;
+}
+
+/* Country flag emoji icon */
+.countryFlagIcon {
+  vertical-align: -3px;
+  font-size: 20px;
+}
+
+/* SVG icon vertical alignment */
+.svgIcon {
+  vertical-align: -3px;
+}
+
+/* Mirror icon horizontally */
+.iconMirror {
+  transform: scaleX(-1);
+}
+
+/* Language grid layout */
+.langGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 8px 4px;
+  min-width: 360px;
+  max-height: none;
+}
+
+/* Language button */
+.langBtn {
+  width: 100%;
+  text-align: center;
+}
+
+/* Country info popover */
+.countryInfoPopover {
+  color: #ccc;
+  font-size: 13px;
+  line-height: 22px;
+}
+
+.countryInfoMeta {
+  color: #888;
+  font-size: 12px;
 }
 

@@ -187,7 +187,7 @@ export default class AskQuestionForm extends React.Component {
                   <div className={styles.askMarkdownPreview}>
                     {focusedPreview
                       ? <pre>{focusedPreview}</pre>
-                      : <span style={{ color: '#6b7280' }}>—</span>
+                      : <span className={styles.previewPlaceholder}>—</span>
                     }
                   </div>
                 </div>

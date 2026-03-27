@@ -71,7 +71,7 @@ body {
 }
 .chat-md table { border-collapse: collapse; margin: 8px 0; font-size: 13px; }
 .chat-md th, .chat-md td { border: 1px solid #555; padding: 6px 10px; }
-.chat-md th { background: #1a1a1a; color: #fff; }
+.chat-md th { background: #1e1e1e; color: #fff; }
 .chat-md a { color: #60a5fa; }
 .chat-md hr { border: none; border-top: 1px solid #2a2a2a; margin: 12px 0; }
 .chat-md strong { color: #f1f5f9; }
@@ -113,7 +113,7 @@ body {
 
 /* antd Modal.confirm dark override */
 .ant-modal-confirm .ant-modal-content {
-  background-color: #1a1a1a;
+  background-color: #1e1e1e;
   border: 1px solid #2a2a2a;
 }
 .ant-modal-confirm .ant-modal-confirm-title {

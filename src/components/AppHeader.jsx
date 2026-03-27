@@ -339,7 +339,7 @@ class AppHeader extends React.Component {
           <table className={styles.statsTable}>
             <thead>
               <tr>
-                <td className={styles.th} style={{ textAlign: 'left' }}>Tool</td>
+                <td className={`${styles.th} ${styles.thLeft}`}>Tool</td>
                 <td className={styles.th}>{t('ui.cacheRebuild.count')}</td>
               </tr>
             </thead>
@@ -369,7 +369,7 @@ class AppHeader extends React.Component {
           <table className={styles.statsTable}>
             <thead>
               <tr>
-                <td className={styles.th} style={{ textAlign: 'left' }}>Skill</td>
+                <td className={`${styles.th} ${styles.thLeft}`}>Skill</td>
                 <td className={styles.th}>{t('ui.cacheRebuild.count')}</td>
               </tr>
             </thead>
@@ -595,13 +595,13 @@ class AppHeader extends React.Component {
                 }).catch(() => {});
               }}
             />
-            <span style={{ marginLeft: 'auto', color: '#888', fontSize: 12, whiteSpace: 'nowrap' }}>{t('ui.calibrationModelLabel')}</span>
+            <span className={styles.cacheCalibrationLabel}>{t('ui.calibrationModelLabel')}</span>
             <Select
               size="small"
               value={this.state.calibrationModel}
               onChange={this.handleCalibrationModelChange}
               options={CALIBRATION_MODELS}
-              style={{ width: 160, flexShrink: 0 }}
+              className={styles.calibrationSelect}
               popupMatchSelectWidth={false}
             />
           </div>
@@ -613,10 +613,10 @@ class AppHeader extends React.Component {
           return (displayTokens || userPromptNavList) ? (
           <div className={styles.cacheTokenInfo}>
             {displayTokens && <>
-              {t('ui.tokens')}: <span style={{ color: '#faad14' }}>write {formatTokenCount(displayTokens.cacheCreateTokens)}</span>
+              {t('ui.tokens')}: <span className={styles.cacheWriteToken}>write {formatTokenCount(displayTokens.cacheCreateTokens)}</span>
               {' / '}
-              <span style={{ color: '#52c41a' }}>read {formatTokenCount(displayTokens.cacheReadTokens)}</span>
-              {displayCtx > 0 && <span style={{ color: '#888', marginLeft: 6 }}>(ctx:{displayCtx}%)</span>}
+              <span className={styles.cacheReadToken}>read {formatTokenCount(displayTokens.cacheReadTokens)}</span>
+              {displayCtx > 0 && <span className={styles.cacheCtxPercent}>(ctx:{displayCtx}%)</span>}
             </>}
             {userPromptNavList && (
               <Popover content={userPromptNavList} trigger="hover" placement="left">
@@ -683,7 +683,7 @@ class AppHeader extends React.Component {
             <table className={styles.statsTable}>
             <thead>
               <tr>
-                <td className={styles.th} style={{ textAlign: 'left' }}>{t('ui.cacheRebuild.reason')}</td>
+                <td className={`${styles.th} ${styles.thLeft}`}>{t('ui.cacheRebuild.reason')}</td>
                 <td className={styles.th}>{t('ui.cacheRebuild.count')}</td>
                 <td className={styles.th}>{t('ui.cacheRebuild.cacheCreate')}</td>
               </tr>
@@ -713,7 +713,7 @@ class AppHeader extends React.Component {
             <table className={styles.statsTable}>
             <thead>
               <tr>
-                <td className={styles.th} style={{ textAlign: 'left' }}>SubAgent</td>
+                <td className={`${styles.th} ${styles.thLeft}`}>SubAgent</td>
                 <td className={styles.th}>{t('ui.cacheRebuild.count')}</td>
               </tr>
             </thead>
@@ -740,7 +740,7 @@ class AppHeader extends React.Component {
             <table className={styles.statsTable}>
             <thead>
               <tr>
-                <td className={styles.th} style={{ textAlign: 'left' }}>Name</td>
+                <td className={`${styles.th} ${styles.thLeft}`}>Name</td>
                 <td className={styles.th}>{t('ui.cacheRebuild.count')}</td>
               </tr>
             </thead>
@@ -1174,7 +1174,7 @@ class AppHeader extends React.Component {
       },
       ...(cliMode && onReturnToWorkspaces ? [{
         key: 'switch-workspace',
-        icon: <ImportOutlined style={{ transform: 'scaleX(-1)' }} />,
+        icon: <ImportOutlined className={styles.iconMirror} />,
         label: t('ui.switchWorkspace'),
         onClick: onReturnToWorkspaces,
       }] : []),
@@ -1211,14 +1211,7 @@ class AppHeader extends React.Component {
           key: 'lang-grid-container',
           type: 'group',
           label: (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '8px',
-              padding: '8px 4px',
-              minWidth: '360px',
-              maxHeight: 'none'
-            }}>
+            <div className={styles.langGrid}>
               {LANG_OPTIONS.map(o => (
                 <Button
                   key={o.value}
@@ -1229,10 +1222,7 @@ class AppHeader extends React.Component {
                     setLang(o.value);
                     if (onLangChange) onLangChange();
                   }}
-                  style={{
-                    width: '100%',
-                    textAlign: 'center'
-                  }}
+                  className={styles.langBtn}
                 >
                   {o.label}
                 </Button>
@@ -1255,7 +1245,7 @@ class AppHeader extends React.Component {
             content={this.renderTokenStats()}
             trigger="hover"
             placement="bottomLeft"
-            overlayInnerStyle={{ background: '#1e1e1e', border: '1px solid #3a3a3a', borderRadius: 8, padding: '8px 8px' }}
+            overlayInnerStyle={{ background: '#1e1e1e', border: '1px solid #3a3a3a', borderRadius: 8, padding: '8px 8px', maxHeight: '80vh', overflowY: 'auto' }}
           >
             <Tag className={styles.tokenStatsTag}>
               <DashboardOutlined className={styles.tokenStatsIcon} />
@@ -1332,7 +1322,7 @@ class AppHeader extends React.Component {
               </Tag>
             ) : (
               <Popover
-                content={this.state._cachePopoverOpen ? this.renderCacheContentPopover(contextPercent) : <div style={{ minWidth: 300 }} />}
+                content={this.state._cachePopoverOpen ? this.renderCacheContentPopover(contextPercent) : <div className={styles.cachePopoverPlaceholder} />}
                 trigger="hover"
                 placement="bottomLeft"
                 overlayInnerStyle={{ background: '#1e1e1e', border: '1px solid #3a3a3a', borderRadius: 8, padding: '8px 8px' }}
@@ -1374,19 +1364,19 @@ class AppHeader extends React.Component {
               {this.state.countryFlag && (
                 <Popover
                   content={this.state.countryInfo ? (
-                    <div style={{ color: '#ccc', fontSize: 13, lineHeight: '22px' }}>
+                    <div className={styles.countryInfoPopover}>
                       <div>{this.state.countryFlag} {this.state.countryInfo.country}</div>
                       {this.state.countryInfo.region && <div>{this.state.countryInfo.region}</div>}
                       {this.state.countryInfo.city && <div>{this.state.countryInfo.city}</div>}
-                      {this.state.countryInfo.org && <div style={{ color: '#888', fontSize: 12 }}>{this.state.countryInfo.org}</div>}
-                      {this.state.countryInfo.ip && <div style={{ color: '#888', fontSize: 12 }}>{this.state.countryInfo.ip}</div>}
+                      {this.state.countryInfo.org && <div className={styles.countryInfoMeta}>{this.state.countryInfo.org}</div>}
+                      {this.state.countryInfo.ip && <div className={styles.countryInfoMeta}>{this.state.countryInfo.ip}</div>}
                     </div>
                   ) : null}
                   trigger="hover"
                   placement="bottomRight"
                   overlayInnerStyle={{ background: '#1e1e1e', border: '1px solid #3a3a3a', borderRadius: 8, padding: '8px 12px' }}
                 >
-                  <Button className={styles.compactBtnNoBorder} icon={<span style={{ verticalAlign: '-3px', fontSize: 20 }}>{this.state.countryFlag}</span>} />
+                  <Button className={styles.compactBtnNoBorder} icon={<span className={styles.countryFlagIcon}>{this.state.countryFlag}</span>} />
                 </Popover>
               )}
               <Popover
@@ -1418,7 +1408,7 @@ class AppHeader extends React.Component {
               <Button
                 className={styles.compactBtnNoBorder}
                 icon={
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-3px' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={styles.svgIcon}>
                     <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
                     <line x1="12" y1="18" x2="12.01" y2="18"/>
                   </svg>
@@ -1566,7 +1556,7 @@ class AppHeader extends React.Component {
           </div>
         </Drawer>
         <Drawer
-          title={<span><BarChartOutlined style={{ marginRight: 8 }} />{t('ui.projectStats')}</span>}
+          title={<span><BarChartOutlined className={styles.titleIcon} />{t('ui.projectStats')}</span>}
           placement="left"
           width={400}
           open={this.state.projectStatsVisible}
@@ -1575,12 +1565,12 @@ class AppHeader extends React.Component {
           {this.renderProjectStatsContent()}
         </Drawer>
         <Modal
-          title={<span><ApiOutlined style={{ marginRight: 8 }} />{t('ui.pluginManagement')}</span>}
+          title={<span><ApiOutlined className={styles.titleIcon} />{t('ui.pluginManagement')}</span>}
           open={this.state.pluginModalVisible}
           onCancel={() => this.setState({ pluginModalVisible: false })}
           footer={
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', gap: 8 }}>
+            <div className={styles.pluginModalFooter}>
+              <div className={styles.pluginModalFooterLeft}>
                 <Button icon={<PlusOutlined />} onClick={this.handleAddPlugin}>{t('ui.plugins.add')}</Button>
                 <Button icon={<CloudDownloadOutlined />} onClick={this.handleShowCdnModal}>{t('ui.plugins.cdnInstall')}</Button>
               </div>
@@ -1591,7 +1581,7 @@ class AppHeader extends React.Component {
         >
           {this.state.pluginsDir && (
             <div className={styles.pluginDirHint}>
-              <span style={{ color: '#888' }}>{t('ui.plugins.pluginsDir')}:</span>{' '}
+              <span className={styles.pluginDirLabel}>{t('ui.plugins.pluginsDir')}:</span>{' '}
               <code
                 className={styles.pluginDirPath}
                 onClick={() => {
@@ -1606,8 +1596,8 @@ class AppHeader extends React.Component {
           )}
           {this.state.pluginsList.length === 0 ? (
             <div className={styles.pluginEmpty}>
-              <div style={{ fontSize: 14, marginBottom: 4 }}>{t('ui.plugins.empty')}</div>
-              <div style={{ fontSize: 12, color: '#666' }}>{t('ui.plugins.emptyHint')}</div>
+              <div className={styles.pluginEmptyTitle}>{t('ui.plugins.empty')}</div>
+              <div className={styles.pluginEmptyHint}>{t('ui.plugins.emptyHint')}</div>
             </div>
           ) : (
             <div className={styles.pluginList}>
@@ -1653,7 +1643,7 @@ class AppHeader extends React.Component {
           <p>{this.state.deleteTarget ? t('ui.plugins.deleteConfirm', { name: this.state.deleteTarget.name }) : ''}</p>
         </Modal>
         <Modal
-          title={<span><CloudDownloadOutlined style={{ marginRight: 8 }} />{t('ui.plugins.cdnInstall')}</span>}
+          title={<span><CloudDownloadOutlined className={styles.titleIcon} />{t('ui.plugins.cdnInstall')}</span>}
           open={this.state.cdnModalVisible}
           onCancel={this.handleCdnCancel}
           onOk={this.handleCdnInstall}
@@ -1663,18 +1653,18 @@ class AppHeader extends React.Component {
           width={480}
         >
           <div>
-            <div style={{ marginBottom: 6, color: '#ccc', fontSize: 13 }}>{t('ui.plugins.cdnUrl')}</div>
+            <div className={styles.cdnUrlLabel}>{t('ui.plugins.cdnUrl')}</div>
             <Input
               placeholder={t('ui.plugins.cdnUrlPlaceholder')}
               value={this.state.cdnUrl}
               onChange={this.handleCdnUrlChange}
               onPressEnter={this.handleCdnInstall}
-              style={{ background: '#1a1a2e', borderColor: '#333', color: '#eee' }}
+              className={styles.cdnInput}
             />
           </div>
         </Modal>
         <Modal
-          title={<span><DashboardOutlined style={{ marginRight: 8 }} />{t('ui.processManagement')}</span>}
+          title={<span><DashboardOutlined className={styles.titleIcon} />{t('ui.processManagement')}</span>}
           open={this.state.processModalVisible}
           onCancel={() => this.setState({ processModalVisible: false })}
           footer={

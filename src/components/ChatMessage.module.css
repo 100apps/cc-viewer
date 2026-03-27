@@ -112,7 +112,7 @@
 
 .bubbleAssistant {
   composes: bubble;
-  background: rgb(20, 20, 20);
+  background: #141414;
   color: #F5F5F5;
   transition: box-shadow 0s;
   position: relative;
@@ -127,11 +127,11 @@
 }
 
 .bubbleHighlight {
-  box-shadow: 0 0 10px rgba(22, 104, 220, 0.6);
+  box-shadow: 0 0 10px #1668dc99;
 }
 
 .bubbleHighlightFading {
-  box-shadow: 0 0 10px rgba(22, 104, 220, 0);
+  box-shadow: 0 0 10px #1668dc00;
   transition: box-shadow 5s ease-out;
 }
 
@@ -280,7 +280,7 @@
 
 .pathTagClickable:hover {
   text-decoration: underline;
-  color: #93c5fd;
+  color: #60a5fa;
 }
 
 /* === Tool call inline spans === */
@@ -336,7 +336,7 @@
 
 .compactLabel {
   font-size: 12px;
-  color: #93c5fd;
+  color: #60a5fa;
 }
 
 .compactPre {
@@ -358,7 +358,7 @@
 }
 
 .viewRequestBtn:hover {
-  color: #93c5fd;
+  color: #60a5fa;
 }
 
 /* === User-selection question === */
@@ -451,7 +451,7 @@
 }
 
 .planModeLabel {
-  color: #93c5fd;
+  color: #60a5fa;
   font-weight: 600;
 }
 
@@ -486,7 +486,7 @@
 }
 
 .planStatusApproved.planStatusBadge {
-  background: rgba(34, 197, 94, 0.15);
+  background: #22c55e26;
   color: #4ade80;
 }
 
@@ -495,7 +495,7 @@
 }
 
 .planStatusRejected.planStatusBadge {
-  background: rgba(239, 68, 68, 0.15);
+  background: #ef444426;
   color: #f87171;
 }
 
@@ -504,14 +504,14 @@
 }
 
 .planStatusPending.planStatusBadge {
-  background: rgba(22, 104, 220, 0.15);
-  color: #93c5fd;
+  background: #1668dc26;
+  color: #60a5fa;
 }
 
 .planFeedback {
   margin-top: 6px;
   padding: 6px 8px;
-  background: rgba(239, 68, 68, 0.08);
+  background: #ef444414;
   border-radius: 4px;
   font-size: 12px;
   color: #e5e7eb;
@@ -532,7 +532,7 @@
   padding: 4px 16px;
   border-radius: 4px;
   border: 1px solid #22c55e;
-  background: rgba(34, 197, 94, 0.15);
+  background: #22c55e26;
   color: #4ade80;
   font-size: 13px;
   cursor: pointer;
@@ -540,14 +540,14 @@
 }
 
 .planApproveBtn:hover {
-  background: rgba(34, 197, 94, 0.3);
+  background: #22c55e4d;
 }
 
 .planRejectBtn {
   padding: 4px 16px;
   border-radius: 4px;
   border: 1px solid #ef4444;
-  background: rgba(239, 68, 68, 0.15);
+  background: #ef444426;
   color: #f87171;
   font-size: 13px;
   cursor: pointer;
@@ -555,14 +555,14 @@
 }
 
 .planRejectBtn:hover {
-  background: rgba(239, 68, 68, 0.3);
+  background: #ef44444d;
 }
 
 .planOptionBtn {
   padding: 4px 16px;
   border-radius: 4px;
   border: 1px solid #6b7280;
-  background: rgba(107, 114, 128, 0.15);
+  background: #6b728026;
   color: #d1d5db;
   font-size: 13px;
   cursor: pointer;
@@ -570,7 +570,7 @@
 }
 
 .planOptionBtn:hover {
-  background: rgba(107, 114, 128, 0.3);
+  background: #6b72804d;
 }
 
 .planFeedbackInputWrap {
@@ -608,7 +608,7 @@
   padding: 4px 16px;
   border-radius: 4px;
   border: 1px solid #3b82f6;
-  background: rgba(59, 130, 246, 0.2);
+  background: #3b82f633;
   color: #60a5fa;
   font-size: 13px;
   cursor: pointer;
@@ -616,7 +616,7 @@
 }
 
 .planFeedbackSendBtn:hover {
-  background: rgba(59, 130, 246, 0.35);
+  background: #3b82f659;
 }
 
 .planFeedbackSendBtn:disabled {
@@ -628,7 +628,7 @@
   padding: 4px 16px;
   border-radius: 4px;
   border: 1px solid #6b7280;
-  background: rgba(107, 114, 128, 0.15);
+  background: #6b728026;
   color: #d1d5db;
   font-size: 13px;
   cursor: pointer;
@@ -636,7 +636,7 @@
 }
 
 .planFeedbackCancelBtn:hover {
-  background: rgba(107, 114, 128, 0.3);
+  background: #6b72804d;
 }
 
 /* === AskUserQuestion 交互模式 === */
@@ -733,7 +733,7 @@
   padding: 4px 20px;
   border-radius: 4px;
   border: 1px solid #1668dc;
-  background: rgba(22, 104, 220, 0.2);
+  background: #1668dc33;
   color: #60a5fa;
   font-size: 13px;
   cursor: pointer;
@@ -741,7 +741,7 @@
 }
 
 .askSubmitBtn:hover {
-  background: rgba(22, 104, 220, 0.35);
+  background: #1668dc59;
 }
 
 .askSubmitBtn:disabled {
@@ -780,4 +780,43 @@
   font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
   font-size: 11px;
   line-height: 1.5;
+}
+
+/* === ChatImage === */
+
+.chatImageFallback {
+  color: #888;
+  font-size: 12px;
+}
+
+.chatImageImg {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: 6px;
+  margin: 6px 0;
+  display: block;
+  cursor: pointer;
+}
+
+/* === Highlight bubble wrapper === */
+
+.bubbleRelative {
+  position: relative;
+}
+
+/* === Skill loaded spacer === */
+
+.skillSpacer {
+  width: 32px;
+  flex-shrink: 0;
+}
+
+/* === Skill time text indent === */
+
+.skillTimeIndent {
+  margin-left: 8px;
+}
+
+.previewPlaceholder {
+  color: #6b7280;
 }

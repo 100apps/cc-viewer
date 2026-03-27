@@ -66,7 +66,7 @@ function TreeDir({ name, node, depth, onFileClick, selectedFile }) {
       {name && (
         <div className={styles.dirItem} style={{ paddingLeft: 8 + depth * 16 }}>
           <span className={styles.dirArrow}>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'rotate(90deg)' }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={styles.rotated90}>
               <polyline points="9 6 15 12 9 18"/>
             </svg>
           </span>

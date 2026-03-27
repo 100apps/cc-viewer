@@ -37,11 +37,11 @@
 }
 
 .sectionHeader:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: #ffffff0d;
 }
 
 .sectionHeader:focus-visible {
-  outline: 1px solid rgba(99, 179, 237, 0.75);
+  outline: 1px solid #1668dcbf;
   outline-offset: -1px;
 }
 
@@ -62,7 +62,7 @@
 .sectionCount {
   font-size: 11px;
   color: #666;
-  background: #1f1f1f;
+  background: #1e1e1e;
   border-radius: 10px;
   padding: 0 6px;
   line-height: 18px;
@@ -91,11 +91,11 @@
 
 .historyToggle:hover {
   color: #888;
-  background: rgba(255, 255, 255, 0.03);
+  background: #ffffff08;
 }
 
 .historyToggle:focus-visible {
-  outline: 1px solid rgba(99, 179, 237, 0.75);
+  outline: 1px solid #1668dcbf;
   outline-offset: -1px;
 }
 
@@ -121,23 +121,23 @@
 }
 
 .item:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: #ffffff0a;
   color: #d1d5db;
 }
 
 .item:focus-visible {
-  outline: 1px solid rgba(99, 179, 237, 0.75);
+  outline: 1px solid #1668dcbf;
   outline-offset: -1px;
 }
 
 .itemActive {
-  background: rgba(99, 179, 237, 0.12);
-  color: #63b3ed;
+  background: #1668dc1f;
+  color: #1668dc;
 }
 
 .itemActive:hover {
-  background: rgba(99, 179, 237, 0.16);
-  color: #63b3ed;
+  background: #1668dc29;
+  color: #1668dc;
 }
 
 .itemContent {
@@ -217,15 +217,15 @@
 }
 
 .role_user {
-  background: rgba(59, 130, 246, 0.18);
+  background: #3b82f62e;
   color: #60a5fa;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  border: 1px solid #3b82f64d;
 }
 
 .role_assistant {
-  background: rgba(139, 92, 246, 0.18);
+  background: #8b5cf62e;
   color: #a78bfa;
-  border: 1px solid rgba(139, 92, 246, 0.3);
+  border: 1px solid #8b5cf64d;
 }
 
 .roleLabel {
@@ -308,7 +308,7 @@
 }
 
 .thinkingHeader:hover {
-  background: rgba(255, 255, 200, 0.03);
+  background: #ffffc808;
 }
 
 .thinkingPreview {
@@ -374,8 +374,8 @@
 .errorLabel {
   font-size: 10px;
   color: #f87171;
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: #ef44441f;
+  border: 1px solid #ef444440;
   border-radius: 3px;
   padding: 1px 5px;
 }
@@ -388,34 +388,34 @@
   text-transform: uppercase;
   padding: 1px 5px;
   border-radius: 3px;
-  background: #1a1a1a;
+  background: #1e1e1e;
   color: #666;
   border: 1px solid #2a2a2a;
   flex-shrink: 0;
 }
 
 .blockTagText {
-  background: rgba(59, 130, 246, 0.1);
+  background: #3b82f61a;
   color: #60a5fa;
-  border-color: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f633;
 }
 
 .blockTagThinking {
-  background: rgba(234, 179, 8, 0.1);
+  background: #eab3081a;
   color: #ca8a04;
-  border-color: rgba(234, 179, 8, 0.2);
+  border-color: #eab30833;
 }
 
 .blockTagResult {
-  background: rgba(34, 197, 94, 0.1);
+  background: #22c55e1a;
   color: #4ade80;
-  border-color: rgba(34, 197, 94, 0.2);
+  border-color: #22c55e33;
 }
 
 .blockTagError {
-  background: rgba(239, 68, 68, 0.1);
+  background: #ef44441a;
   color: #f87171;
-  border-color: rgba(239, 68, 68, 0.2);
+  border-color: #ef444433;
 }
 
 /* ── JSON block ── */

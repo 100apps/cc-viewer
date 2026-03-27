@@ -32,6 +32,7 @@
 }
 
 .chatSection {
+  flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -40,7 +41,7 @@
 
 .vResizer {
   width: 5px;
-  background: #1a1a1a;
+  background: #1e1e1e;
   cursor: col-resize;
   flex-shrink: 0;
   border-left: 1px solid #2a2a2a;
@@ -63,7 +64,7 @@
   flex-shrink: 0;
   cursor: pointer;
   color: #555;
-  background: rgba(255, 255, 255, 0.04);
+  background: #ffffff0a;
   border-radius: 4px 0 0 4px;
   transition: background 0.2s, color 0.2s;
   z-index: 20;
@@ -71,7 +72,7 @@
 }
 
 .terminalToggle:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: #ffffff1a;
   color: #999;
 }
 
@@ -81,7 +82,7 @@
   bottom: 0;
   width: 2px;
   background: transparent;
-  border-left: 2px dashed rgba(255, 255, 255, 0.1);
+  border-left: 2px dashed #ffffff1a;
   pointer-events: none;
   z-index: 1000;
   transition: all 0.15s;
@@ -93,7 +94,7 @@
   bottom: 0;
   width: 2px;
   background: transparent;
-  border-left: 2px dashed rgba(255, 255, 255, 0.5);
+  border-left: 2px dashed #ffffff80;
   pointer-events: none;
   z-index: 1001;
 }
@@ -103,7 +104,7 @@
   top: 50%;
   left: 8px;
   transform: translateY(-50%);
-  background: rgba(255, 255, 255, 0.9);
+  background: #ffffffe6;
   color: #000;
   padding: 4px 8px;
   border-radius: 4px;
@@ -111,14 +112,14 @@
   font-weight: 600;
   white-space: nowrap;
   font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px #0000004d;
 }
 
 .snapPreview {
   position: absolute;
   top: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.1);
+  background: #ffffff1a;
   pointer-events: none;
   z-index: 999;
 }
@@ -141,7 +142,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #1a1a1a;
+  background: #1e1e1e;
   border: 1px solid #333;
   border-radius: 12px;
   transition: border-color 0.2s;
@@ -243,7 +244,7 @@
 }
 
 .stickyBottomBtn span {
-  background: rgba(0, 0, 0, 0.5);
+  background: #00000080;
   padding: 2px 10px;
   border-radius: 10px;
 }
@@ -305,7 +306,7 @@
   padding: 6px 14px;
   border-radius: 18px;
   border: 1px solid #3a3a3a;
-  background: #1a1a1a;
+  background: #1e1e1e;
   color: #bbb;
   font-size: 12px;
   cursor: pointer;
@@ -323,7 +324,7 @@
   padding: 6px 14px;
   border-radius: 18px;
   border: 1px solid #4a9eff;
-  background: rgba(74, 158, 255, 0.15);
+  background: #4a9eff26;
   color: #4a9eff;
   font-size: 12px;
   cursor: pointer;
@@ -332,7 +333,7 @@
 }
 
 .ptyPromptOptionPrimary:hover {
-  background: rgba(74, 158, 255, 0.25);
+  background: #4a9eff40;
   color: #6ab4ff;
   border-color: #6ab4ff;
 }
@@ -341,7 +342,7 @@
   padding: 6px 14px;
   border-radius: 18px;
   border: 1px solid #4a9eff;
-  background: rgba(74, 158, 255, 0.2);
+  background: #4a9eff33;
   color: #4a9eff;
   font-size: 12px;
   cursor: default;
@@ -380,7 +381,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  background: #1a1a1a;
+  background: #1e1e1e;
   border-top: 1px solid #2a2a2a;
   cursor: pointer;
   flex-shrink: 0;
@@ -416,7 +417,7 @@
   padding: 6px 18px;
   border-radius: 16px;
   border: 1px solid #3a3a3a;
-  background: rgba(255, 255, 255, 0.06);
+  background: #ffffff0f;
   color: #999;
   font-size: 12px;
   cursor: pointer;
@@ -424,14 +425,14 @@
 }
 
 .loadMoreBtn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: #ffffff1f;
   color: #ccc;
 }
 
 .navSidebar {
   width: 40px;
   flex-shrink: 0;
-  background: rgb(26, 26, 26);  border-right: 1px solid #2a2a2a;
+  background: #1a1a1a;  border-right: 1px solid #2a2a2a;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -456,14 +457,14 @@
 
 .navBtn:hover {
   color: #ccc;
-  background: #1a1a1a;
+  background: #1e1e1e;
 }
 
 .navBtnActive {
   width: 32px;
   height: 32px;
   border: none;
-  background: rgba(74, 158, 255, 0.15);
+  background: #4a9eff26;
   color: #4a9eff;
   cursor: pointer;
   display: flex;
@@ -475,7 +476,7 @@
 }
 
 .navBtnActive:hover {
-  background: rgba(74, 158, 255, 0.25);
+  background: #4a9eff40;
   color: #6ab4ff;
 }
 
@@ -483,7 +484,7 @@
   display: flex;
   gap: 6px;
   padding: 6px 12px;
-  background: rgb(26, 26, 26);
+  background: #1a1a1a;
   border-bottom: 1px solid #333;
   overflow-x: auto;
   flex-shrink: 0;
@@ -545,7 +546,7 @@
   right: 4px;
   width: 10px;
   height: 10px;
-  border: 2px solid rgba(255, 255, 255, 0.15);
+  border: 2px solid #ffffff26;
   border-top-color: #fa8c16;
   border-radius: 50%;
   animation: teamSpin 0.8s linear infinite;
@@ -620,7 +621,7 @@
   font-size: 12px;
   color: #888;
   user-select: none;
-  border-bottom: 1px solid #1a1a1a;
+  border-bottom: 1px solid #1e1e1e;
   transition: color 0.15s;
 }
 
@@ -631,7 +632,7 @@
 .teamGanttWrap {
   --gantt-label-width: 110px;
   padding: 8px 16px 4px;
-  border-bottom: 1px solid #1a1a1a;
+  border-bottom: 1px solid #1e1e1e;
   position: relative;
   max-height: 120px;
   overflow-y: auto;
@@ -683,7 +684,7 @@
   z-index: 2;
   pointer-events: auto;
   cursor: default;
-  filter: drop-shadow(0 0 2px rgba(0,0,0,0.9));
+  filter: drop-shadow(0 0 2px #000000e6);
   transition: transform 0.15s;
 }
 
@@ -709,7 +710,7 @@
   background: #4a9eff;
   z-index: 10;
   pointer-events: none;
-  box-shadow: 0 0 6px rgba(74, 158, 255, 0.5);
+  box-shadow: 0 0 6px #4a9eff80;
   transition: left 0.15s ease-out;
 }
 
@@ -729,7 +730,7 @@
 
 .teamAgentCard {
   padding: 8px;
-  border-radius: 6px;
+  border-radius: 0;
   margin-bottom: 6px;
   border-left: 3px solid #333;
   background: #111;
@@ -737,11 +738,11 @@
 }
 
 .teamAgentCard:hover {
-  background: #1a1a1a;
+  background: #1e1e1e;
 }
 
 .teamAgentCardActive {
-  background: #1f1f1f !important;
+  background: #1e1e1e !important;
 }
 
 .teamAgentCardHeader {
@@ -793,8 +794,8 @@
 }
 
 .teamAgentPopTeammateMsg {
-  background: #0d1b2a;
-  border: 1px solid #1b3a5c;
+  background: #060f2a;
+  border: 1px solid #0b2a5c;
   border-radius: 6px;
   padding: 10px 12px;
   margin-bottom: 8px;
@@ -836,8 +837,8 @@
 }
 
 .teammateReportEntry {
-  background: #0d1b2a;
-  border: 1px solid #1b3a5c;
+  background: #060f2a;
+  border: 1px solid #0b2a5c;
   border-radius: 8px;
   padding: 12px;
   margin: 4px 0;
@@ -849,7 +850,7 @@
   gap: 8px;
   margin-bottom: 8px;
   padding-bottom: 6px;
-  border-bottom: 1px solid #1b3a5c;
+  border-bottom: 1px solid #0b2a5c;
 }
 
 .teammateReportName {
@@ -879,4 +880,106 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.teamBtnRelative {
+  position: relative;
+}
+
+.ganttLabelLead {
+  color: #196ae1;
+  font-weight: 600;
+}
+
+.ganttLabelAgent {
+  color: #eee;
+}
+
+.ganttTimeAxisRow {
+  margin-top: 2px;
+}
+
+.ganttTimeAxisTrack {
+  background: transparent;
+  height: 16px;
+  position: relative;
+}
+
+.ganttTickLabel {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: #555;
+  white-space: nowrap;
+}
+
+.teamPopoverStatus {
+  margin-right: 6px;
+  font-size: 10px;
+}
+
+.terminalPanelWrap {
+  flex-shrink: 0;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+.ganttIndicatorInitial {
+  left: 110px;
+}
+
+.teamModalTitle {
+  color: #e5e5e5;
+  font-size: 15px;
+}
+
+.teamLeadCard {
+  border-left-color: #196ae1;
+}
+
+.agentNoMessages {
+  color: #666;
+  font-size: 12px;
+}
+
+.teamAgentCardClickable {
+  border-left-color: #eee;
+  cursor: pointer;
+}
+
+.agentStatusDurSuffix {
+  color: #888;
+}
+
+.navSidebarContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.innerSplitArea {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  position: relative;
+}
+
+.chatSectionFlex {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.overlayPanel {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
 }

@@ -66,7 +66,7 @@ export default function ConceptHelp({ doc }) {
   return (
     <>
       <span className={styles.helpBtn} onClick={(e) => { e.stopPropagation(); loadDoc(); }}>?</span>
-      <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: { colorBgContainer: '#111', colorBgLayout: '#0a0a0a', colorBgElevated: '#1a1a1a', colorBorder: '#2a2a2a' } }}>
+      <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: { colorPrimary: '#1668dc', colorBgContainer: '#111', colorBgLayout: '#0a0a0a', colorBgElevated: '#1e1e1e', colorBorder: '#2a2a2a' } }}>
         <Modal
           title={title}
           open={open}

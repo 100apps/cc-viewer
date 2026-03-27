@@ -819,7 +819,7 @@ class TerminalPanel extends React.Component {
         <div ref={this.containerRef} className={styles.terminalContainer} />
         {!isMobile && (
           <div className={styles.terminalToolbar}>
-            <input type="file" ref={this.fileInputRef} style={{ display: 'none' }} onChange={this.handleFileUpload} />
+            <input type="file" ref={this.fileInputRef} className={styles.hiddenFileInput} onChange={this.handleFileUpload} />
             <button className={styles.toolbarBtn} onClick={() => this.fileInputRef.current?.click()} title={t('ui.terminal.upload')}>
               <UploadIcon />
               <span>{t('ui.terminal.upload')}</span>
@@ -838,7 +838,7 @@ class TerminalPanel extends React.Component {
                 content={
                   <div className={styles.presetMenu}>
                     {this.state.presetItems.length === 0 ? (
-                      <div style={{ color: '#666', fontSize: 13, padding: '8px 12px', textAlign: 'center' }}>—</div>
+                      <div className={styles.popoverEmptyHint}>—</div>
                     ) : (
                       this.state.presetItems.map(item => {
                         const isBuiltinRaw = item.builtinId && !item.modified;
@@ -866,7 +866,7 @@ class TerminalPanel extends React.Component {
                 overlayInnerStyle={{ background: '#1e1e1e', border: '1px solid #3a3a3a', borderRadius: 8, padding: '12px 16px', maxWidth: 360 }}
                 content={
                   <div>
-                    <div style={{ color: '#ccc', fontSize: 13, marginBottom: 10 }}>{t('ui.terminal.agentTeamDisabledTip')}</div>
+                    <div className={styles.agentTeamDisabledTip}>{t('ui.terminal.agentTeamDisabledTip')}</div>
                     <Button type="primary" size="small" loading={this.state.agentTeamEnabling} disabled={this.state.agentTeamEnabling} onClick={this.handleEnableAgentTeam}>{this.state.agentTeamEnabling ? t('ui.terminal.agentTeamEnabling') : t('ui.terminal.agentTeamEnable')}</Button>
                   </div>
                 }
@@ -877,7 +877,7 @@ class TerminalPanel extends React.Component {
                 </button>
               </Popover>
             )}
-            <button className={styles.toolbarBtn} style={{ marginLeft: 'auto' }} onClick={() => this.setState({ presetModalVisible: true })} title={t('ui.terminal.presetShortcuts')}>
+            <button className={`${styles.toolbarBtn} ${styles.toolbarBtnRight}`} onClick={() => this.setState({ presetModalVisible: true })} title={t('ui.terminal.presetShortcuts')}>
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             </button>
           </div>
@@ -904,14 +904,14 @@ class TerminalPanel extends React.Component {
           onCancel={() => this.setState({ presetModalVisible: false, presetSelected: new Set() })}
           footer={null}
           width={800}
-          styles={{ content: { background: '#1a1a1a', border: '1px solid #333' }, header: { background: '#1a1a1a', borderBottom: 'none' } }}
+          styles={{ content: { background: '#1e1e1e', border: '1px solid #333' }, header: { background: '#1e1e1e', borderBottom: 'none' } }}
         >
-          <div style={{ marginBottom: 8 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5' }}>{t('ui.terminal.agentTeamCustom')}</span>
+          <div className={styles.presetSectionHeader}>
+            <span className={styles.presetSectionTitle}>{t('ui.terminal.agentTeamCustom')}</span>
           </div>
           <div className={styles.presetList} onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }} onDrop={(e) => { e.preventDefault(); e.stopPropagation(); }}>
             {this.state.presetItems.length === 0 ? (
-              <div style={{ color: '#666', fontSize: 13, padding: '12px 0', textAlign: 'center' }}>—</div>
+              <div className={styles.presetListEmptyHint}>—</div>
             ) : (
               this.state.presetItems.map((item, idx) => {
                 const isBuiltinRaw = item.builtinId && !item.modified;
@@ -951,7 +951,7 @@ class TerminalPanel extends React.Component {
               })
             )}
           </div>
-          <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+          <div className={styles.presetActions}>
             <Button size="small" danger disabled={this.state.presetSelected.size === 0} onClick={this.handlePresetDelete}>{t('ui.terminal.deleteSelected')}</Button>
             <Button size="small" onClick={() => this.setState({ presetAddVisible: true, presetAddName: '', presetAddText: '', presetEditId: null })}>{t('ui.terminal.addItem')}</Button>
           </div>
@@ -967,10 +967,10 @@ class TerminalPanel extends React.Component {
           cancelText={t('ui.cancel')}
           okButtonProps={{ disabled: !this.state.presetAddText.trim() && !this.state.presetAddName.trim() }}
           width="fit-content"
-          styles={{ content: { background: '#1a1a1a', border: '1px solid #333' }, header: { background: '#1a1a1a', borderBottom: 'none' } }}
+          styles={{ content: { background: '#1e1e1e', border: '1px solid #333' }, header: { background: '#1e1e1e', borderBottom: 'none' } }}
         >
-          <div style={{ marginBottom: 8 }}>
-            <label style={{ fontSize: 13, color: '#aaa', display: 'block', marginBottom: 4 }}>Team {t('ui.terminal.teamName')}</label>
+          <div className={styles.presetFormField}>
+            <label className={styles.presetFormLabel}>Team {t('ui.terminal.teamName')}</label>
             <input
               className={styles.presetInput}
               placeholder={t('ui.terminal.teamNamePlaceholder')}
@@ -979,7 +979,7 @@ class TerminalPanel extends React.Component {
             />
           </div>
           <div>
-            <label style={{ fontSize: 13, color: '#aaa', display: 'block', marginBottom: 4 }}>Team {t('ui.terminal.teamDesc')}</label>
+            <label className={styles.presetFormLabel}>Team {t('ui.terminal.teamDesc')}</label>
             <textarea
               className={styles.presetTextarea}
               rows={6}

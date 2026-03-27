@@ -1194,7 +1194,7 @@ class App extends React.Component {
         dataIndex: 'timestamp',
         key: 'time',
         width: mobile ? 150 : 180,
-        render: (ts) => <span style={{ whiteSpace: 'nowrap' }}>{this.formatTimestamp(ts, mobile)}</span>,
+        render: (ts) => <span className={styles.tableTimestampCell}>{this.formatTimestamp(ts, mobile)}</span>,
       },
       {
         title: t('ui.logPreview'),
@@ -1206,7 +1206,7 @@ class App extends React.Component {
           if (!Array.isArray(arr) || arr.length === 0) return '—';
           const first = arr[0];
           const displayText = (first.length <= 30 && arr.length > 1) ? `${first} | ${arr[1]}` : first;
-          if (arr.length <= 1) return <span style={{ maxWidth: 600, display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom' }}>{displayText}</span>;
+          if (arr.length <= 1) return <span className={styles.tablePreviewText}>{displayText}</span>;
           return (
             <Popover
               trigger={mobile ? 'click' : 'hover'}
@@ -1230,7 +1230,7 @@ class App extends React.Component {
                 </div>
               }
             >
-              <span style={{ cursor: 'pointer', textDecoration: mobile ? 'underline dotted #666' : 'none', maxWidth: 600, display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom' }}>{displayText}</span>
+              <span className={styles.tablePreviewTextClickable} style={{ textDecoration: mobile ? 'underline dotted #666' : 'none' }}>{displayText}</span>
             </Popover>
           );
         },
@@ -1240,21 +1240,21 @@ class App extends React.Component {
         dataIndex: 'turns',
         key: 'turns',
         width: 80,
-        render: (v) => <Tag style={{ background: '#0a0a0a', border: '1px solid #444', color: '#999' }}>{v || 0}</Tag>,
+        render: (v) => <Tag className={styles.tableTag}>{v || 0}</Tag>,
       }] : []),
       {
         title: t('ui.logSize'),
         dataIndex: 'size',
         key: 'size',
         width: 90,
-        render: (v) => <Tag style={{ background: '#0a0a0a', border: '1px solid #444', color: '#999' }}>{this.formatSize(v)}</Tag>,
+        render: (v) => <Tag className={styles.tableTag}>{this.formatSize(v)}</Tag>,
       },
       {
         title: t('ui.logActions'),
         key: 'actions',
         width: mobile ? 160 : 180,
         render: (_, log) => (
-          <span style={{ display: 'flex', gap: 4 }}>
+          <span className={styles.tableActionsCell}>
             <Button size="small" type="primary" onClick={(e) => { e.stopPropagation(); this.handleOpenLogFile(log.file); }}>
               {t('ui.openLog')}
             </Button>
@@ -1637,9 +1637,10 @@ class App extends React.Component {
           theme={{
             algorithm: theme.darkAlgorithm,
             token: {
+              colorPrimary: '#1668dc',
               colorBgContainer: '#111',
               colorBgLayout: '#0a0a0a',
-              colorBgElevated: '#1a1a1a',
+              colorBgElevated: '#1e1e1e',
               colorBorder: '#2a2a2a',
             },
           }}
@@ -1654,9 +1655,9 @@ class App extends React.Component {
       const mobileIsLocalLog = !!this._isLocalLog;
       const mobileChatActive = mobileIsLocalLog || this.state.mobileChatVisible;
       return (
-        <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', background: '#000' }}>
-          <div style={{ padding: '10px 12px', background: '#111', borderBottom: '1px solid #222', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'relative' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div className={styles.mobileCLIRoot}>
+          <div className={styles.mobileCLIHeader}>
+            <div className={styles.mobileCLIHeaderLeft}>
               <button
                 className={styles.mobileMenuBtn}
                 onClick={() => this.setState(prev => ({ mobileMenuVisible: !prev.mobileMenuVisible }))}
@@ -1669,9 +1670,9 @@ class App extends React.Component {
                 </svg>
               </button>
               <Badge status="processing" color="green" />
-              <span style={{ fontSize: 12, color: '#aaa' }}>{mobileIsLocalLog ? t('ui.historyLog', { file: this._localLogFile }) : (t('ui.liveMonitoring') + (this.state.projectName ? `: ${this.state.projectName}` : ''))}</span>
+              <span className={styles.mobileCLIStatusLabel}>{mobileIsLocalLog ? t('ui.historyLog', { file: this._localLogFile }) : (t('ui.liveMonitoring') + (this.state.projectName ? `: ${this.state.projectName}` : ''))}</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div className={styles.mobileCLIHeaderRight}>
               {mobileIsLocalLog ? (
                 <Button
                   type="text"
@@ -1760,7 +1761,7 @@ class App extends React.Component {
               </>
             )}
           </div>
-          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          <div className={styles.mobileCLIBody}>
             {!mobileIsLocalLog && <TerminalPanel />}
             <div className={`${styles.mobileGitDiffOverlay} ${this.state.mobileGitDiffVisible ? styles.mobileGitDiffOverlayVisible : ''}`}>
               <div className={styles.mobileGitDiffInner}>
@@ -1774,7 +1775,7 @@ class App extends React.Component {
                   <div className={styles.mobileLoadingLabel}>{t('ui.loadingChat')}{fileLoadingCount > 0 ? ` (${fileLoadingCount})` : ''}</div>
                 </div>
               )}
-              <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: { colorBgContainer: '#111', colorBgLayout: '#0a0a0a', colorBgElevated: '#1a1a1a', colorBorder: '#2a2a2a' } }}>
+              <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: { colorPrimary: '#1668dc', colorBgContainer: '#111', colorBgLayout: '#0a0a0a', colorBgElevated: '#1e1e1e', colorBorder: '#2a2a2a' } }}>
                 <div className={styles.mobileChatInner}>
                   <ChatView
                     requests={filteredRequests}
@@ -1854,7 +1855,7 @@ class App extends React.Component {
                     );
                   }
                   return (
-                    <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: { colorBgContainer: '#111', colorBgLayout: '#0a0a0a', colorBgElevated: '#1a1a1a', colorBorder: '#2a2a2a' } }}>
+                    <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: { colorPrimary: '#1668dc', colorBgContainer: '#111', colorBgLayout: '#0a0a0a', colorBgElevated: '#1e1e1e', colorBorder: '#2a2a2a' } }}>
                     <div className={styles.logListContainer}>
                       {this.renderLogTable(currentLogs, true)}
                     </div>
@@ -1873,17 +1874,17 @@ class App extends React.Component {
                   </svg>
                 </button>
               </div>
-              <div style={{ padding: '12px 16px' }}>
-                <div style={{ fontSize: 13, color: '#888', fontWeight: 500, marginBottom: 12 }}>{t('ui.chatDisplaySwitches')}</div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #222' }}>
-                  <span style={{ color: '#ccc', fontSize: 14 }}>{t('ui.collapseToolResults')}</span>
+              <div className={styles.mobileSettingsBody}>
+                <div className={styles.mobileSettingsSectionTitle}>{t('ui.chatDisplaySwitches')}</div>
+                <div className={styles.mobileSettingsRow}>
+                  <span className={styles.mobileSettingsLabel}>{t('ui.collapseToolResults')}</span>
                   <Switch
                     checked={!!this.state.collapseToolResults}
                     onChange={this.handleCollapseToolResultsChange}
                   />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #222' }}>
-                  <span style={{ color: '#ccc', fontSize: 14 }}>{t('ui.expandThinking')}</span>
+                <div className={styles.mobileSettingsRow}>
+                  <span className={styles.mobileSettingsLabel}>{t('ui.expandThinking')}</span>
                   <Switch
                     checked={!!this.state.expandThinking}
                     onChange={this.handleExpandThinkingChange}
@@ -1906,15 +1907,15 @@ class App extends React.Component {
                   const prompts = this.extractUserPrompts(filteredRequests);
                   if (prompts.length === 0) {
                     return (
-                      <div style={{ textAlign: 'center', color: '#666', padding: '40px 20px', fontSize: 14 }}>
+                      <div className={styles.mobilePromptEmpty}>
                         {t('ui.noPrompt')}
                       </div>
                     );
                   }
                   return (
                     <>
-                      <div style={{ padding: '8px 12px', borderBottom: '1px solid #222', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 13, color: '#888' }}>
+                      <div className={styles.mobilePromptHeader}>
+                        <span className={styles.mobilePromptCount}>
                           {prompts.length} {t('ui.promptCountUnit')}
                         </span>
                         <Button
@@ -1952,9 +1953,10 @@ class App extends React.Component {
         theme={{
           algorithm: theme.darkAlgorithm,
           token: {
+            colorPrimary: '#1668dc',
             colorBgContainer: '#111',
             colorBgLayout: '#0a0a0a',
-            colorBgElevated: '#1a1a1a',
+            colorBgElevated: '#1e1e1e',
             colorBorder: '#2a2a2a',
           },
         }}
@@ -2082,7 +2084,7 @@ class App extends React.Component {
               </div>
               )
             )}
-            <div style={{ display: viewMode === 'chat' ? 'flex' : 'none', height: '100%', flexDirection: 'column' }}>
+            <div className={styles.chatViewWrapper} style={{ display: viewMode === 'chat' ? 'flex' : 'none' }}>
               <ChatView requests={filteredRequests} mainAgentSessions={mainAgentSessions} userProfile={this.state.userProfile} collapseToolResults={this.state.collapseToolResults} expandThinking={this.state.expandThinking} showThinkingSummaries={this.state.showThinkingSummaries} onViewRequest={this.handleViewRequest} scrollToTimestamp={this.state.chatScrollToTs} onScrollTsDone={this.handleScrollTsDone} cliMode={this._isLocalLog ? false : this.state.cliMode} terminalVisible={this._isLocalLog ? false : this.state.terminalVisible} onToggleTerminal={() => this.setState(prev => ({ terminalVisible: !prev.terminalVisible }))} pendingUploadPaths={this.state.pendingUploadPaths} onUploadPathsConsumed={this.handleUploadPathsConsumed} fileLoading={this.state.fileLoading} />
             </div>
           </Layout.Content>
@@ -2107,21 +2109,21 @@ class App extends React.Component {
           keyboard={false}
           footer={
             <div>
-              <div style={{ textAlign: 'right', marginBottom: 8 }}>
-                <Button key="continue" type="primary" onClick={() => this.handleResumeChoice('continue')} style={{ marginRight: 8 }}>
+              <div className={styles.resumeFooterRight}>
+                <Button key="continue" type="primary" onClick={() => this.handleResumeChoice('continue')} className={styles.btnMarginRight}>
                   {t('ui.resume.continue')}
                 </Button>
                 <Button key="new" onClick={() => this.handleResumeChoice('new')}>
                   {t('ui.resume.new')}
                 </Button>
               </div>
-              <div style={{ textAlign: 'left' }}>
+              <div className={styles.resumeFooterLeft}>
                 <Checkbox
                   checked={this.state.resumeRememberChoice}
                   onChange={(e) => this.setState({ resumeRememberChoice: e.target.checked })}
-                  style={{ opacity: 0.6 }}
+                  className={styles.resumeCheckboxOpacity}
                 >
-                  <span style={{ opacity: 0.6 }}>{t('ui.resume.remember')}</span>
+                  <span className={styles.resumeCheckboxOpacity}>{t('ui.resume.remember')}</span>
                 </Checkbox>
               </div>
             </div>
@@ -2131,7 +2133,7 @@ class App extends React.Component {
         </Modal>
 
         <Modal
-          title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><OpenFolderIcon apiEndpoint={apiUrl('/api/open-log-dir')} title={t('ui.openLogDir')} size={16} />{t('ui.importLocalLogs')}</span>}
+          title={<span className={styles.modalTitleInline}><OpenFolderIcon apiEndpoint={apiUrl('/api/open-log-dir')} title={t('ui.openLogDir')} size={16} />{t('ui.importLocalLogs')}</span>}
           open={this.state.importModalVisible}
           onCancel={this.handleCloseImportModal}
           footer={null}
@@ -2147,7 +2149,7 @@ class App extends React.Component {
               type={this.state.selectedLogs.size > 1 ? 'primary' : 'default'}
               disabled={this.state.selectedLogs.size < 2}
               onClick={this.handleMergeLogs}
-              style={{ marginLeft: 8 }}
+              className={styles.btnMarginLeft}
             >
               {t('ui.mergeLogs')}
             </Button>
@@ -2157,7 +2159,7 @@ class App extends React.Component {
               icon={<DeleteOutlined />}
               disabled={this.state.selectedLogs.size === 0}
               onClick={this.handleDeleteLogs}
-              style={{ marginLeft: 8 }}
+              className={styles.btnMarginLeft}
             >
               {t('ui.deleteLogs')}
             </Button>
@@ -2166,7 +2168,7 @@ class App extends React.Component {
               icon={<ReloadOutlined spin={this.state.refreshingStats} />}
               loading={this.state.refreshingStats}
               onClick={this.handleRefreshStats}
-              style={{ marginLeft: 8 }}
+              className={styles.btnMarginLeft}
             >
               {t('ui.refreshStats')}
             </Button>

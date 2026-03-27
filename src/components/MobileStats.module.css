@@ -61,3 +61,15 @@
   white-space: nowrap;
   max-width: 0;
 }
+
+.thLeft {
+  text-align: left;
+}
+
+.colWide {
+  width: 50%;
+}
+
+.colNarrow {
+  width: 25%;
+}

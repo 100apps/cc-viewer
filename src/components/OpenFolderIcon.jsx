@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import styles from './OpenFolderIcon.module.css';
 
 /**
  * Folder icon that changes to a yellow open-folder on hover.
@@ -43,7 +44,8 @@ export default function OpenFolderIcon({ apiEndpoint, title, size = 16 }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       title={title}
-      style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', opacity: hovered ? 1 : 0.7, transition: 'opacity 0.15s', flexShrink: 0 }}
+      className={styles.iconBtn}
+      style={{ opacity: hovered ? 1 : 0.7 }}
     >
       {hovered ? openFolder : closedFolder}
     </span>

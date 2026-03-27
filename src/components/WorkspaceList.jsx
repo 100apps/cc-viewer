@@ -3,6 +3,7 @@ import { List, Button, Input, Empty, Typography, Space, Card, Popconfirm, messag
 import { FolderOpenOutlined, FolderOutlined, DeleteOutlined, PlusOutlined, RocketOutlined, ClockCircleOutlined, DatabaseOutlined, ArrowUpOutlined, BranchesOutlined } from '@ant-design/icons';
 import { t } from '../i18n';
 import { apiUrl } from '../utils/apiUrl';
+import styles from './WorkspaceList.module.css';
 
 const { Text, Title } = Typography;
 
@@ -76,7 +77,7 @@ function DirBrowser({ open, onClose, onSelect }) {
       styles={{ body: { padding: '12px 0' } }}
     >
       {/* 当前路径 + 上级按钮 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 16px 10px', borderBottom: '1px solid #2a2a2a' }}>
+      <div className={styles.dirPathHeader}>
         <Button
           type="text"
           icon={<ArrowUpOutlined />}
@@ -84,44 +85,38 @@ function DirBrowser({ open, onClose, onSelect }) {
           onClick={() => parentPath && browse(parentPath)}
           size="small"
         />
-        <Text style={{ color: '#e0e0e0', fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          <FolderOpenOutlined style={{ marginRight: 6, color: '#1668dc' }} />
+        <Text className={styles.dirCurrentPath}>
+          <FolderOpenOutlined className={styles.dirFolderIcon} />
           {currentPath}
         </Text>
       </div>
 
       {/* 目录列表 */}
-      <div style={{ maxHeight: 400, overflowY: 'auto', padding: '4px 0' }}>
+      <div className={styles.dirList}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+          <div className={styles.dirListCenter}><Spin /></div>
         ) : dirs.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40 }}>
+          <div className={styles.dirListCenter}>
             <Text type="secondary">{t('ui.workspaces.emptyDir')}</Text>
           </div>
         ) : (
           dirs.map(dir => (
             <div
               key={dir.path}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '8px 16px',
-                cursor: 'pointer',
-                transition: 'background 0.15s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = '#1a1a1a'}
+              className={styles.dirItem}
+              onMouseEnter={e => e.currentTarget.style.background = '#1e1e1e'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
               <div
-                style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}
+                className={styles.dirItemInner}
                 onClick={() => browse(dir.path)}
               >
                 <FolderOutlined style={{ color: dir.hasGit ? '#1668dc' : '#666', fontSize: 16, flexShrink: 0 }} />
-                <Text style={{ color: '#d0d0d0', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <Text className={styles.dirItemName}>
                   {dir.name}
                 </Text>
                 {dir.hasGit && (
-                  <Tag color="blue" style={{ fontSize: 11, lineHeight: '18px', padding: '0 4px', margin: 0, flexShrink: 0 }}>
+                  <Tag color="blue" className={styles.dirGitTag}>
                     <BranchesOutlined style={{ marginRight: 2 }} />git
                   </Tag>
                 )}
@@ -139,7 +134,7 @@ function DirBrowser({ open, onClose, onSelect }) {
       </div>
 
       {/* 也可以选择当前目录 */}
-      <div style={{ borderTop: '1px solid #2a2a2a', padding: '10px 16px 4px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className={styles.dirFooter}>
         <Button
           type="primary"
           ghost
@@ -149,14 +144,14 @@ function DirBrowser({ open, onClose, onSelect }) {
         >
           {t('ui.workspaces.selectCurrent')} — {currentPath.split('/').pop() || currentPath}
         </Button>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className={styles.dirPathInputRow}>
           <Input
             size="small"
             value={pathInput}
             onChange={e => setPathInput(e.target.value)}
             onPressEnter={handleGoTo}
             placeholder={t('ui.workspaces.pathPlaceholder')}
-            style={{ flex: 1 }}
+            className={styles.dirPathInput}
           />
           <Button size="small" onClick={handleGoTo}>{t('ui.workspaces.goTo')}</Button>
         </div>
@@ -233,23 +228,17 @@ export default function WorkspaceList({ onLaunch }) {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#0a0a0a',
-      display: 'flex',
-      justifyContent: 'center',
-      paddingTop: 60,
-    }}>
-      <div style={{ width: '100%', maxWidth: 720, padding: '0 24px' }}>
-        <div style={{ marginBottom: 32, textAlign: 'center' }}>
-          <Title level={3} style={{ color: '#e0e0e0', margin: 0 }}>
+    <div className={styles.root}>
+      <div className={styles.inner}>
+        <div className={styles.header}>
+          <Title level={3} className={styles.headerTitle}>
             <FolderOpenOutlined style={{ marginRight: 8, color: '#1668dc' }} />
             {t('ui.workspaces.title')}
           </Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>{t('ui.workspaces.subtitle')}</Text>
+          <Text type="secondary" className={styles.headerSubtitle}>{t('ui.workspaces.subtitle')}</Text>
         </div>
 
-        <div style={{ marginBottom: 20, textAlign: 'center' }}>
+        <div className={styles.addButtonRow}>
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -261,13 +250,13 @@ export default function WorkspaceList({ onLaunch }) {
         </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 60 }}>
+          <div className={styles.loadingCenter}>
             <Spin />
           </div>
         ) : workspaces.length === 0 ? (
           <Empty
             description={<Text type="secondary">{t('ui.workspaces.empty')}</Text>}
-            style={{ marginTop: 60 }}
+            className={styles.emptyState}
           />
         ) : (
           <List
@@ -276,22 +265,17 @@ export default function WorkspaceList({ onLaunch }) {
               <Card
                 key={item.id}
                 size="small"
-                style={{
-                  marginBottom: 10,
-                  background: '#141414',
-                  borderColor: '#2a2a2a',
-                  cursor: 'pointer',
-                }}
+                className={styles.card}
                 hoverable
                 onClick={() => handleLaunch(item)}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <Text strong style={{ color: '#e0e0e0', fontSize: 15 }}>{item.projectName}</Text>
+                <div className={styles.cardRow}>
+                  <div className={styles.cardLeft}>
+                    <div className={styles.cardNameRow}>
+                      <Text strong className={styles.cardName}>{item.projectName}</Text>
                     </div>
-                    <Text type="secondary" style={{ fontSize: 12, wordBreak: 'break-all' }}>{item.path}</Text>
-                    <div style={{ display: 'flex', gap: 16, marginTop: 6, fontSize: 12, color: '#666' }}>
+                    <Text type="secondary" className={styles.cardPath}>{item.path}</Text>
+                    <div className={styles.cardMeta}>
                       <span><ClockCircleOutlined style={{ marginRight: 4 }} />{timeAgo(item.lastUsed)}</span>
                       {item.logCount > 0 && (
                         <span><DatabaseOutlined style={{ marginRight: 4 }} />{item.logCount} logs ({formatSize(item.totalSize)})</span>

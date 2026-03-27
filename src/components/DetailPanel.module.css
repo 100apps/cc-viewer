@@ -15,7 +15,7 @@
 
 .urlSection {
   padding: 12px 0;
-  border-bottom: 1px solid #1f1f1f;
+  border-bottom: 1px solid #1e1e1e;
   display: flex;
   align-items: flex-start;
 }
@@ -111,7 +111,7 @@
 .headerRow {
   display: flex;
   padding: 4px 0;
-  border-bottom: 1px solid #1f1f1f;
+  border-bottom: 1px solid #1e1e1e;
 }
 
 .headerKey {
@@ -126,7 +126,7 @@
 
 .streamingBox {
   padding: 20px;
-  background: #1a1a1a;
+  background: #1e1e1e;
   border-radius: 6px;
   border: 1px solid #2a2a2a;
 }
@@ -202,7 +202,7 @@
 .viewInChatBtn:hover {
   border-color: #666;
   color: #d1d5db;
-  background: rgba(255, 255, 255, 0.06);
+  background: #ffffff0f;
 }
 
 .reminderSelect {
@@ -222,4 +222,147 @@
 
 .reminderSelect :global(.ant-select-selection-placeholder) {
   font-size: 11px;
+}
+
+.diffHeaderRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.diffSpaceRight {
+  margin-left: auto;
+}
+
+.reminderFilterWrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reminderLabel {
+  color: #888;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.cacheTabContent {
+  height: calc(100vh - 220px);
+  min-height: 400px;
+}
+
+.userPromptList {
+  width: 600px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.userPromptItem {
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #ccc;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-radius: 3px;
+}
+
+.userPromptNavBtn {
+  margin-left: auto;
+  font-size: 11px;
+  color: #1668dc;
+  cursor: pointer;
+  border: 1px solid #1668dc;
+  border-radius: 3px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.cacheContent {
+  padding: 8px 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.cacheTokenBar {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  font-family: monospace;
+  color: #aaa;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.cacheTokenWrite {
+  color: #faad14;
+}
+
+.cacheTokenRead {
+  color: #52c41a;
+}
+
+.cacheCopyIcon {
+  margin-left: 8px;
+  cursor: pointer;
+  color: #888;
+  transition: color 0.2s;
+}
+
+.cacheScrollArea {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.cacheSectionBlock {
+  margin-bottom: 12px;
+}
+
+.cacheSectionHeader {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e5e5e5;
+  margin-bottom: 6px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cacheCollapseArrow {
+  display: inline-block;
+  transition: transform 0.2s;
+  font-size: 10px;
+}
+
+.cachePre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #ccc;
+  background: #111;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  padding: 8px;
+  margin: 4px 0;
+  font-family: Menlo, Monaco, monospace;
+}
+
+.cachePreSystem {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #ccc;
+  background: #060f2a;
+  border: 1px solid #0b2a5c;
+  border-radius: 4px;
+  padding: 8px;
+  margin: 4px 0;
+  font-family: Menlo, Monaco, monospace;
 }

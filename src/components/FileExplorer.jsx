@@ -202,7 +202,7 @@ function TreeNode({ item, path, depth, onFileClick, expandedPaths, onToggleExpan
       >
         <span className={styles.arrow}>
           {isDir ? (
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={styles.arrowIcon} style={{ transform: expanded ? 'rotate(90deg)' : 'none' }}>
               <polyline points="9 6 15 12 9 18"/>
             </svg>
           ) : ''}

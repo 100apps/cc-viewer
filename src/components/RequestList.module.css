@@ -16,7 +16,7 @@
   cursor: pointer;
   padding: 8px 12px;
   border-left: 3px solid transparent;
-  border-bottom: 1px solid #1f1f1f;
+  border-bottom: 1px solid #1e1e1e;
   transition: background 0.15s;
 }
 
@@ -124,4 +124,20 @@
 
 .cacheDotNormal {
   background-color: #3a3a3a;
+}
+
+.tagPlan {
+  color: #a33;
+  border-color: #a33;
+  background-color: #000;
+}
+
+.tagMuted {
+  color: #666;
+  border-color: #444;
+  background-color: #000;
+}
+
+.tooltipPreLine {
+  white-space: pre-line;
 }
