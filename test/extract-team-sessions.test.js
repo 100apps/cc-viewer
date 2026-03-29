@@ -1,11 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { extractTeamSessions } from '../src/utils/teamSessionParser.js';
 
-// src/components 是 Vite 前端模块（JSX），Node 直接运行会报错。
-// 这里直接内联 extractTeamSessions 的核心逻辑进行单元测试。
-// ====================================================================
+// Inlined function removed — now imported from src/utils/teamSessionParser.js
 
-function extractTeamSessions(requests) {
+function extractTeamSessions_REMOVED_UNUSED(requests) {
   const teams = [];
   let currentTeamIdx = -1;
 

@@ -7,7 +7,7 @@ import { renderAssistantText } from '../utils/systemTags';
 import { apiUrl } from '../utils/apiUrl';
 import AskQuestionForm from './AskQuestionForm';
 import { t } from '../i18n';
-import { isPlanApprovalPrompt } from './ChatView';
+import { isPlanApprovalPrompt } from '../utils/promptClassifier';
 import DiffView from './DiffView';
 import ToolResultView from './ToolResultView';
 

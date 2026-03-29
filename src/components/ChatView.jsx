@@ -14,6 +14,11 @@ import defaultModelAvatarUrl from '../img/default-model-avatar.svg';
 import { isSystemText, classifyUserContent, isMainAgent, isTeammate } from '../utils/contentFilter';
 import { classifyRequest, formatRequestTag, formatTeammateLabel } from '../utils/requestType';
 import { buildChunksForAnswer } from '../utils/ptyChunkBuilder';
+import { isPlanApprovalPrompt, isDangerousOperationPrompt } from '../utils/promptClassifier';
+import { isImageFile, isMutatingCommand } from '../utils/commandValidator';
+import { extractTeamSessions } from '../utils/teamSessionParser';
+import { createEmptyToolState, appendToolResultMap, cachedBuildToolResultMap, parseAskAnswerText, parsePlanApproval, getToolResultCache, setToolResultCache } from '../utils/toolResultBuilder';
+import { buildTeamModalData } from '../utils/teamModalBuilder';
 import { isMobile } from '../env';
 import { t } from '../i18n';
 import { apiUrl } from '../utils/apiUrl';
@@ -23,371 +28,11 @@ const { Text } = Typography;
 
 const QUEUE_THRESHOLD = 20;
 
-
-
-const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp']);
-function isImageFile(path) {
-  const ext = (path || '').split('.').pop().toLowerCase();
-  return IMAGE_EXTS.has(ext);
-}
-
-// 从 requests 中提取 Team 会话列表
-function extractTeamSessions(requests) {
-  const teams = [];
-  let currentTeamIdx = -1; // 当前唯一打开的 team 在 teams[] 中的 index
-
-  // 查找 tool_use 对应的 tool_result（在后续 request 的 messages 中）
-  // 搜索窗口扩大到 10 以应对空行/非主agent请求插入导致的距离增大
-  function findToolResult(toolUseId, fromRequestIdx) {
-    for (let j = fromRequestIdx + 1; j < requests.length && j <= fromRequestIdx + 10; j++) {
-      const msgs = requests[j]?.body?.messages;
-      if (!Array.isArray(msgs)) continue;
-      for (const msg of msgs) {
-        const blocks = msg.role === 'user' && Array.isArray(msg.content) ? msg.content : [];
-        for (const b of blocks) {
-          if (b.type === 'tool_result' && b.tool_use_id === toolUseId) {
-            return typeof b.content === 'string' ? b.content : JSON.stringify(b.content || '');
-          }
-        }
-      }
-    }
-    return null;
-  }
-
-  function isDeleteSuccessful(resultText) {
-    if (!resultText) return false;
-    if (resultText.includes('"success":true') || resultText.includes('"success": true')) return true;
-    if (resultText.includes('Cleaned up')) return true;
-    if (resultText.includes('Cannot cleanup')) return false;
-    // 没有明确失败标记的默认视为成功
-    return true;
-  }
-
-  for (let i = 0; i < requests.length; i++) {
-    const req = requests[i];
-    const respContent = req.response?.body?.content;
-    if (!Array.isArray(respContent)) continue;
-    for (const block of respContent) {
-      if (block.type !== 'tool_use') continue;
-      const name = block.name;
-      const input = typeof block.input === 'string' ? (() => { try { return JSON.parse(block.input); } catch { return {}; } })() : (block.input || {});
-      if (name === 'TeamCreate') {
-        // 检查 TeamCreate 是否成功（tool_result 中不能有错误标记）
-        const createResult = findToolResult(block.id, i);
-        if (createResult && (createResult.includes('"error":') || createResult.includes('"error" :') || createResult.includes('Already leading team'))) continue;
-        const teamName = input.team_name || input.teamName || 'unknown';
-        const ts = req.timestamp || req.response?.timestamp;
-        // 新 TeamCreate 出现时，自动关闭前一个未关闭的 team（避免孤立）
-        if (currentTeamIdx >= 0 && !teams[currentTeamIdx].endTime) {
-          teams[currentTeamIdx].endTime = ts;
-          teams[currentTeamIdx].endRequestIndex = Math.max(teams[currentTeamIdx].requestIndex, i - 1);
-          teams[currentTeamIdx]._inferredEnd = true;
-        }
-        const team = { name: teamName, startTime: ts, endTime: null, requestIndex: i, endRequestIndex: null, taskCount: 0, teammateCount: 0, _teammates: new Set() };
-        teams.push(team);
-        currentTeamIdx = teams.length - 1;
-      } else if (name === 'TeamDelete') {
-        const resultText = findToolResult(block.id, i);
-        if (!isDeleteSuccessful(resultText)) continue; // 失败的 TeamDelete 不关闭 team
-        const ts = req.timestamp || req.response?.timestamp;
-        if (currentTeamIdx < 0) {
-          // Cross-file: TeamCreate 在上一个 JSONL 中，从 tool_result 反向推断 team
-          let teamName = 'unknown';
-          try { const parsed = JSON.parse(resultText); teamName = parsed.team_name || teamName; } catch {}
-          // 回溯寻找最早的关联 Agent 调用作为 startTime
-          let startIdx = 0;
-          let startTs = requests[0]?.timestamp || requests[0]?.response?.timestamp;
-          for (let k = 0; k < i; k++) {
-            const kResp = requests[k]?.response?.body?.content;
-            if (!Array.isArray(kResp)) continue;
-            for (const kb of kResp) {
-              if (kb.type === 'tool_use' && kb.name === 'Agent') {
-                const kInp = typeof kb.input === 'string' ? (() => { try { return JSON.parse(kb.input); } catch { return {}; } })() : (kb.input || {});
-                if ((kInp.team_name || kInp.teamName) === teamName) {
-                  startIdx = k;
-                  startTs = requests[k]?.timestamp || requests[k]?.response?.timestamp;
-                  break;
-                }
-              }
-            }
-            if (startIdx > 0) break;
-          }
-          const team = { name: teamName, startTime: startTs, endTime: ts, requestIndex: startIdx, endRequestIndex: i, taskCount: 0, teammateCount: 0, _teammates: new Set(), _inferredStart: true };
-          // 回填 teammate 和 task 计数
-          for (let k = startIdx; k < i; k++) {
-            const kResp = requests[k]?.response?.body?.content;
-            if (!Array.isArray(kResp)) continue;
-            for (const kb of kResp) {
-              if (kb.type !== 'tool_use') continue;
-              if (kb.name === 'Agent') {
-                const kInp = typeof kb.input === 'string' ? (() => { try { return JSON.parse(kb.input); } catch { return {}; } })() : (kb.input || {});
-                const an = kInp.name || '';
-                if (!team._teammates.has(an)) { team._teammates.add(an); team.teammateCount++; }
-              } else if (kb.name === 'TaskCreate' || kb.name === 'TaskUpdate') {
-                team.taskCount++;
-              }
-            }
-          }
-          teams.push(team);
-          continue;
-        }
-        teams[currentTeamIdx].endTime = ts;
-        teams[currentTeamIdx].endRequestIndex = i;
-        currentTeamIdx = -1; // 清理：team 已关闭
-      } else if (name === 'SendMessage') {
-        // 跟踪 shutdown_request 作为备用结束信号
-        if (currentTeamIdx >= 0 && input.message?.type === 'shutdown_request') {
-          const shutdownTs = req.timestamp || req.response?.timestamp;
-          teams[currentTeamIdx]._lastShutdownTime = shutdownTs;
-          teams[currentTeamIdx]._lastShutdownRequestIdx = i;
-        }
-      } else if (name === 'TaskCreate' || name === 'TaskUpdate') {
-        if (currentTeamIdx >= 0) teams[currentTeamIdx].taskCount++;
-      } else if (name === 'Agent') {
-        const teamName = input.team_name || input.teamName;
-        const agentName = input.name || '';
-        let targetIdx = -1;
-        if (teamName) {
-          // 按 team_name 精确匹配（使用反向搜索，优先匹配最近的同名 team）
-          for (let ti = teams.length - 1; ti >= 0; ti--) {
-            if (teams[ti].name === teamName && !teams[ti].endTime) { targetIdx = ti; break; }
-          }
-        }
-        // fallback：如果没有 team_name 但有唯一打开的 team
-        if (targetIdx < 0 && currentTeamIdx >= 0) targetIdx = currentTeamIdx;
-        if (targetIdx >= 0) {
-          const t = teams[targetIdx];
-          if (!t._teammates.has(agentName)) { t._teammates.add(agentName); t.teammateCount++; }
-        }
-      }
-    }
-  }
-  // 后处理：为未关闭的 team 推断 endTime
-  for (const team of teams) {
-    if (team.endTime) continue;
-    // 优先使用 shutdown_request 时间戳，其次使用最后一条请求的时间戳
-    if (team._lastShutdownTime) {
-      team.endTime = team._lastShutdownTime;
-      team.endRequestIndex = team._lastShutdownRequestIdx;
-      team._inferredEnd = true;
-    } else {
-      const lastReq = requests[requests.length - 1];
-      const lastTs = lastReq?.response?.timestamp || lastReq?.timestamp;
-      if (lastTs && team.startTime !== lastTs) {
-        team.endTime = lastTs;
-        team.endRequestIndex = requests.length - 1;
-        team._inferredEnd = true;
-      }
-    }
-  }
-  return teams;
-}
-
-const MUTATING_CMD_RE = /\b(rm|mkdir|mv|cp|touch|chmod|chown|ln|git\s+(checkout|reset|stash|merge|rebase|cherry-pick|restore|clean|rm)|npm\s+(install|uninstall|ci)|yarn\s+(add|remove)|pnpm\s+(add|remove|install)|pip\s+install|tar|unzip|curl\s+-[^\s]*o|wget)\b|[^>]>(?!>)|>>/;
-
-function isMutatingCommand(cmd) {
-  return MUTATING_CMD_RE.test(cmd);
-}
 const MOBILE_ITEM_LIMIT = 240;
 const MOBILE_LOAD_MORE_STEP = 100;
 
 function randomInterval() {
   return 100 + Math.random() * 50;
-}
-
-export function isPlanApprovalPrompt(prompt) {
-  if (!prompt || !prompt.question) return false;
-  const q = prompt.question.toLowerCase();
-  return /plan/i.test(q) && (/approv/i.test(q) || /proceed/i.test(q) || /accept/i.test(q));
-}
-
-export function isDangerousOperationPrompt(prompt) {
-  if (!prompt || !prompt.question) return false;
-  const q = prompt.question;
-  if (isPlanApprovalPrompt(prompt)) return false;
-  return /do you want to proceed|allow.*to|want to allow/i.test(q);
-}
-
-// --- 单 pass 增量 tool result 构建 ---
-
-const _toolResultCache = new WeakMap();
-
-function createEmptyToolState() {
-  return {
-    toolUseMap: {},
-    toolResultMap: {},
-    readContentMap: {},
-    editSnapshotMap: {},
-    askAnswerMap: {},
-    planApprovalMap: {},
-    latestPlanContent: null,
-    _fileState: {},
-  };
-}
-
-function appendToolResultMap(state, messages, startIndex) {
-  const { toolUseMap, toolResultMap, readContentMap, editSnapshotMap, askAnswerMap, planApprovalMap, _fileState } = state;
-  for (let i = startIndex; i < messages.length; i++) {
-    const msg = messages[i];
-    if (msg.role === 'assistant' && Array.isArray(msg.content)) {
-      for (const block of msg.content) {
-        if (block.type === 'tool_use') {
-          let parsed = block;
-          if (typeof block.input === 'string') {
-            try {
-              const cleaned = block.input.replace(/^\[object Object\]/, '');
-              parsed = { ...block, input: JSON.parse(cleaned) };
-            } catch {}
-          }
-          toolUseMap[parsed.id] = parsed;
-          // Write → .claude/plans/ 文件内容追踪
-          if (parsed.name === 'Write' && parsed.input?.file_path
-            && /\.claude\/plans\//i.test(parsed.input.file_path) && parsed.input.content) {
-            state.latestPlanContent = parsed.input.content;
-          }
-          // Edit → editSnapshotMap + _fileState 更新
-          if (parsed.name === 'Edit' && parsed.input) {
-            const fp = parsed.input.file_path;
-            const oldStr = parsed.input.old_string;
-            const newStr = parsed.input.new_string;
-            if (fp && oldStr != null && newStr != null && _fileState[fp]) {
-              const entry = _fileState[fp];
-              editSnapshotMap[parsed.id] = { plainText: entry.plainText, lineNums: entry.lineNums.slice() };
-              const idx = entry.plainText.indexOf(oldStr);
-              if (idx >= 0) {
-                const before = entry.plainText.substring(0, idx);
-                const lineOffset = before.split('\n').length - 1;
-                const oldLineCount = oldStr.split('\n').length;
-                const newLineCount = newStr.split('\n').length;
-                const lineDelta = newLineCount - oldLineCount;
-                entry.plainText = entry.plainText.substring(0, idx) + newStr + entry.plainText.substring(idx + oldStr.length);
-                if (lineDelta !== 0) {
-                  const startNum = entry.lineNums[lineOffset] || (lineOffset + 1);
-                  const newNums = [];
-                  for (let j = 0; j < newLineCount; j++) {
-                    newNums.push(startNum + j);
-                  }
-                  entry.lineNums = [
-                    ...entry.lineNums.slice(0, lineOffset),
-                    ...newNums,
-                    ...entry.lineNums.slice(lineOffset + oldLineCount).map(n => n + lineDelta),
-                  ];
-                }
-              }
-            }
-          }
-        }
-      }
-    } else if (msg.role === 'user' && Array.isArray(msg.content)) {
-      for (const block of msg.content) {
-        if (block.type === 'tool_result') {
-          const matchedTool = toolUseMap[block.tool_use_id];
-          let label = t('ui.toolReturn');
-          let toolName = null;
-          let toolInput = null;
-          if (matchedTool) {
-            toolName = matchedTool.name;
-            toolInput = matchedTool.input;
-            if (matchedTool.name === 'Task' && matchedTool.input) {
-              const st = matchedTool.input.subagent_type || '';
-              const desc = matchedTool.input.description || '';
-              label = `SubAgent: ${st}${desc ? ' — ' + desc : ''}`;
-            } else {
-              label = t('ui.toolReturnNamed', { name: matchedTool.name });
-            }
-          }
-          const resultText = extractToolResultText(block);
-          const isError = !!block.is_error;
-          const isPermissionDenied = isError && /doesn't want to proceed|Permission.*denied|rejected.*tool use|interrupted by user for tool use/i.test(resultText);
-          toolResultMap[block.tool_use_id] = { label, toolName, toolInput, resultText, isError, isPermissionDenied };
-          if (matchedTool && matchedTool.name === 'Read' && matchedTool.input?.file_path) {
-            readContentMap[matchedTool.input.file_path] = resultText;
-            // _fileState 更新（行号解析）
-            const readLines = resultText.split('\n');
-            const plainLines = [];
-            const lineNums = [];
-            for (const rl of readLines) {
-              const m = rl.match(/^\s*(\d+)[\t→](.*)$/);
-              if (m) {
-                lineNums.push(parseInt(m[1], 10));
-                plainLines.push(m[2]);
-              }
-            }
-            if (plainLines.length > 0) {
-              const existing = _fileState[matchedTool.input.file_path];
-              if (existing) {
-                const mergedMap = new Map();
-                const existingLines = existing.plainText.split('\n');
-                for (let j = 0; j < existing.lineNums.length; j++) {
-                  mergedMap.set(existing.lineNums[j], existingLines[j]);
-                }
-                for (let j = 0; j < lineNums.length; j++) {
-                  mergedMap.set(lineNums[j], plainLines[j]);
-                }
-                const sortedKeys = [...mergedMap.keys()].sort((a, b) => a - b);
-                _fileState[matchedTool.input.file_path] = {
-                  plainText: sortedKeys.map(k => mergedMap.get(k)).join('\n'),
-                  lineNums: sortedKeys,
-                };
-              } else {
-                _fileState[matchedTool.input.file_path] = { plainText: plainLines.join('\n'), lineNums };
-              }
-            }
-          }
-          if (matchedTool && matchedTool.name === 'AskUserQuestion') {
-            askAnswerMap[block.tool_use_id] = parseAskAnswerText(resultText);
-          }
-          if (matchedTool && matchedTool.name === 'ExitPlanMode') {
-            planApprovalMap[block.tool_use_id] = parsePlanApproval(resultText);
-            // Plan 审批完成（approved/rejected）后重置 latestPlanContent，
-            // 防止下一个 plan 周期显示旧内容
-            state.latestPlanContent = null;
-          }
-        }
-      }
-    }
-  }
-}
-
-function buildToolResultMap(messages) {
-  const state = createEmptyToolState();
-  appendToolResultMap(state, messages, 0);
-  return state;
-}
-
-function cachedBuildToolResultMap(messages) {
-  let cached = _toolResultCache.get(messages);
-  if (!cached) {
-    cached = buildToolResultMap(messages);
-    _toolResultCache.set(messages, cached);
-  }
-  return cached;
-}
-
-/** 从 AskUserQuestion tool_result 文本中提取答案 map */
-function parseAskAnswerText(text) {
-  const answers = {};
-  const re = /"([^"]+)"="([^"]*)"/g;
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    answers[m[1]] = m[2];
-  }
-  return answers;
-}
-
-/** 从 ExitPlanMode tool_result 文本中解析审批状态和计划内容 */
-function parsePlanApproval(text) {
-  if (!text) return { status: 'pending' };
-  if (/User has approved/i.test(text)) {
-    // 提取 "## Approved Plan:" 之后的计划内容
-    const planMatch = text.match(/##\s*Approved Plan:\s*\n([\s\S]*)/i);
-    return { status: 'approved', planContent: planMatch ? planMatch[1].trim() : '' };
-  }
-  if (/User rejected/i.test(text)) {
-    const feedbackMatch = text.match(/feedback:\s*(.+)/i) || text.match(/User rejected[^:]*:\s*(.+)/i);
-    return { status: 'rejected', feedback: feedbackMatch ? feedbackMatch[1].trim() : '' };
-  }
-  return { status: 'pending' };
 }
 
 class ChatView extends React.Component {
@@ -819,7 +464,7 @@ class ChatView extends React.Component {
   renderSessionMessages(messages, keyPrefix, modelInfo, tsToIndex) {
     const { userProfile, collapseToolResults, expandThinking, showThinkingSummaries, onViewRequest } = this.props;
     // 增量 / WeakMap 缓存
-    let cached = _toolResultCache.get(messages);
+    let cached = getToolResultCache(messages);
     if (!cached) {
       const si = parseInt(keyPrefix.slice(1), 10);
       if (this._incToolSessionIdx === si && messages.length >= this._incToolProcessedCount && this._incToolProcessedCount > 0) {
@@ -831,7 +476,7 @@ class ChatView extends React.Component {
       }
       this._incToolProcessedCount = messages.length;
       cached = this._incToolState;
-      _toolResultCache.set(messages, cached);
+      setToolResultCache(messages, cached);
     }
     const { toolUseMap, toolResultMap, readContentMap, editSnapshotMap, askAnswerMap, planApprovalMap, latestPlanContent } = cached;
 
@@ -1135,7 +780,7 @@ class ChatView extends React.Component {
                 }
               }
             }
-            const _cachedLR = _toolResultCache.get(session.messages) || {};
+            const _cachedLR = getToolResultCache(session.messages) || {};
             const planApprovalMap = _cachedLR.planApprovalMap || {};
             const latestPlanContent = _cachedLR.latestPlanContent || null;
             const activePlanPrompt = this.props.cliMode
@@ -1284,14 +929,17 @@ class ChatView extends React.Component {
 
   _detectPrompt() {
     const buf = this._ptyBuffer;
-    // Match a question line ending with ? followed by numbered options
-    const match = buf.match(/([^\n]*\?)\s*\n((?:\s*[❯>]?\s*\d+\.\s+[^\n]+\n?){2,})$/);
-    if (match) {
-      const question = match[1].trim();
-      const optionsBlock = match[2];
-      const optionLines = optionsBlock.match(/\s*([❯>])?\s*(\d+)\.\s+([^\n]+)/g);
+
+    let question = null;
+    let options = null;
+
+    // Pattern 1: Numbered options — "Question?\n  ❯ 1. Option A\n    2. Option B"
+    const match1 = buf.match(/([^\n]*\?)\s*\n((?:\s*[❯>]?\s*\d+\.\s+[^\n]+\n?){2,})$/);
+    if (match1) {
+      question = match1[1].trim();
+      const optionLines = match1[2].match(/\s*([❯>])?\s*(\d+)\.\s+([^\n]+)/g);
       if (optionLines) {
-        const options = optionLines.map(line => {
+        options = optionLines.map(line => {
           const m = line.match(/\s*([❯>])?\s*(\d+)\.\s+(.+)/);
           return {
             number: parseInt(m[2], 10),
@@ -1299,32 +947,63 @@ class ChatView extends React.Component {
             selected: !!m[1],
           };
         });
-        const prev = this.state.ptyPrompt;
-        const prompt = { question, options };
-        // 同一问题只更新选项（光标移动），不重复推入历史
-        if (prev && prev.question === question) {
-          this._currentPtyPrompt = prompt;
-          this.setState({ ptyPrompt: prompt });
-        } else {
-          // 新提示：先将旧的 active 提示标记为 dismissed
-          this._currentPtyPrompt = prompt;
-          this.setState(state => {
-            const history = state.ptyPromptHistory.slice();
-            if (state.ptyPrompt) {
-              const last = history[history.length - 1];
-              if (last && last.status === 'active') {
-                history[history.length - 1] = { ...last, status: 'dismissed' };
-              }
-            }
-            history.push({ ...prompt, status: 'active', selectedNumber: null, timestamp: new Date().toISOString() });
-            // Cap history to prevent unbounded growth
-            if (history.length > 200) history.splice(0, history.length - 200);
-            return { ptyPrompt: prompt, ptyPromptHistory: history };
-          });
-          this.scrollToBottom();
-        }
-        return;
       }
+    }
+
+    // Pattern 2: Non-numbered cursor-based options (Ink Select) —
+    // "Some prompt text\n  ❯ Allow once\n    Deny"
+    // Question line may or may not end with "?"
+    if (!options) {
+      const match2 = buf.match(/([^\n]+)\n((?:\s+[❯>]\s+[^\n]+\n)(?:\s+[^\n]+\n?){1,})$/);
+      if (match2) {
+        const candidateQ = match2[1].trim();
+        const block = match2[2];
+        // Parse lines: each line starts with optional ❯/> marker + text
+        const lines = block.split('\n').filter(l => l.trim());
+        const parsed = [];
+        for (const line of lines) {
+          const m = line.match(/^\s*([❯>])?\s+(.+)/);
+          if (m && m[2].trim()) {
+            parsed.push({
+              number: parsed.length + 1,
+              text: m[2].trim(),
+              selected: !!m[1],
+            });
+          }
+        }
+        if (parsed.length >= 2 && parsed.some(p => p.selected)) {
+          question = candidateQ;
+          options = parsed;
+        }
+      }
+    }
+
+    if (question && options) {
+      const prev = this.state.ptyPrompt;
+      const prompt = { question, options };
+      // 同一问题只更新选项（光标移动），不重复推入历史
+      if (prev && prev.question === question) {
+        this._currentPtyPrompt = prompt;
+        this.setState({ ptyPrompt: prompt });
+      } else {
+        // 新提示：先将旧的 active 提示标记为 dismissed
+        this._currentPtyPrompt = prompt;
+        this.setState(state => {
+          const history = state.ptyPromptHistory.slice();
+          if (state.ptyPrompt) {
+            const last = history[history.length - 1];
+            if (last && last.status === 'active') {
+              history[history.length - 1] = { ...last, status: 'dismissed' };
+            }
+          }
+          history.push({ ...prompt, status: 'active', selectedNumber: null, timestamp: new Date().toISOString() });
+          // Cap history to prevent unbounded growth
+          if (history.length > 200) history.splice(0, history.length - 200);
+          return { ptyPrompt: prompt, ptyPromptHistory: history };
+        });
+        this.scrollToBottom();
+      }
+      return;
     }
     // No match — if there was an active prompt, mark it dismissed
     // But keep plan approval prompts and AskUserQuestion prompts active
@@ -2218,370 +1897,10 @@ class ChatView extends React.Component {
     );
   }
 
-  // Memoized team modal data — only recompute when team or requests change
   _getTeamModalData(team, requests, mainAgentSessions) {
-    const cache = this._teamModalDataCache;
-    if (cache && cache.team === team && cache.requests === requests && cache.mainAgentSessions === mainAgentSessions) return cache.result;
-
-    const startIdx = team.requestIndex;
-    const endIdx = team.endRequestIndex != null ? team.endRequestIndex + 1 : requests.length;
-    const teamRequests = requests.slice(startIdx, endIdx);
-    const teamStartTime = team.startTime;
-    const teamEndTime = team.endTime || (requests[endIdx - 1]?.response?.timestamp || requests[endIdx - 1]?.timestamp);
-
-    // 构建 tsToIndex 和 modelInfo
-    const tsToIndex = {};
-    let modelName = null;
-    for (let i = startIdx; i < endIdx && i < requests.length; i++) {
-      const req = requests[i];
-      if (req.timestamp) tsToIndex[req.timestamp] = i;
-      if (req.body?.model) modelName = req.body.model;
-    }
-    const modelInfo = getModelInfo(modelName);
-
-    // 用户消息提取：展示触发 team 的用户 prompt，帮助理解 team 要解决什么问题。
-    // 用户 prompt 不属于 Agent Team 讨论本身，但对理解上下文至关重要。
-    //
-    // 数据源优先级：
-    // 1. mainAgentSessions（累积会话历史，有 _timestamp）— 覆盖大多数情况
-    // 2. TeamCreate 所在 request 的 body.messages（直接提取）— 覆盖 session 未包含的情况
-    // 3. 首条 assistant 响应文本 — 兜底：/clear 后 messages=[] 时，assistant 会概述要做什么
-    const entries = [];
-    let hasUserMsg = false;
-
-    // 策略 1：从 mainAgentSessions 按时间范围提取
-    if (mainAgentSessions) {
-      let closestBeforeTs = null;
-      for (const session of mainAgentSessions) {
-        for (const msg of session.messages || []) {
-          const ts = msg._timestamp;
-          if (!ts || msg.role !== 'user') continue;
-          if (ts <= teamStartTime && (!closestBeforeTs || ts > closestBeforeTs)) {
-            closestBeforeTs = ts;
-          }
-        }
-      }
-      const effectiveStart = closestBeforeTs || teamStartTime;
-      for (const session of mainAgentSessions) {
-        for (const msg of session.messages || []) {
-          const ts = msg._timestamp;
-          if (!ts || ts < effectiveStart) continue;
-          if (teamEndTime && ts > teamEndTime) continue;
-          if (msg.role !== 'user') continue;
-          const content = msg.content;
-          if (Array.isArray(content)) {
-            const { textBlocks } = classifyUserContent(content);
-            for (const tb of textBlocks) {
-              if (tb.text && tb.text.trim()) {
-                entries.push({ type: 'user', text: tb.text, timestamp: ts });
-                hasUserMsg = true;
-              }
-            }
-          } else if (typeof content === 'string' && !isSystemText(content)) {
-            entries.push({ type: 'user', text: content, timestamp: ts });
-            hasUserMsg = true;
-          }
-        }
-      }
-    }
-
-    // 策略 2：从 TeamCreate request 的 body.messages 直接提取
-    if (!hasUserMsg) {
-      const tcReq = requests[team.requestIndex];
-      const tcMsgs = tcReq?.body?.messages || [];
-      for (let m = tcMsgs.length - 1; m >= 0; m--) {
-        if (tcMsgs[m].role !== 'user') continue;
-        const c = tcMsgs[m].content;
-        if (Array.isArray(c)) {
-          const { textBlocks } = classifyUserContent(c);
-          for (const tb of textBlocks) {
-            if (tb.text && tb.text.trim()) {
-              entries.push({ type: 'user', text: tb.text, timestamp: teamStartTime });
-              hasUserMsg = true;
-            }
-          }
-        } else if (typeof c === 'string' && !isSystemText(c)) {
-          entries.push({ type: 'user', text: c, timestamp: teamStartTime });
-          hasUserMsg = true;
-        }
-        if (hasUserMsg) break;
-      }
-    }
-
-    // 策略 3 兜底：/clear 后 messages=[] 时，用首条 assistant 文本作为上下文
-    if (!hasUserMsg) {
-      for (let i = 0; i < teamRequests.length; i++) {
-        const resp = teamRequests[i].response?.body?.content;
-        if (!Array.isArray(resp)) continue;
-        for (const block of resp) {
-          if (block.type === 'text' && block.text && block.text.trim()) {
-            entries.push({ type: 'context', text: block.text.trim(), timestamp: teamRequests[i].response?.timestamp || teamRequests[i].timestamp });
-            hasUserMsg = true;
-            break;
-          }
-        }
-        if (hasUserMsg) break;
-      }
-    }
-
-    // 收集 assistant + sub-agent 条目
-    for (let i = 0; i < teamRequests.length; i++) {
-      const req = teamRequests[i];
-      const respContent = req.response?.body?.content;
-      if (!Array.isArray(respContent) || respContent.length === 0) continue;
-      const cls = classifyRequest(req, teamRequests[i + 1]);
-      const isMA = isMainAgent(req);
-      const isSub = cls.type === 'SubAgent' || cls.type === 'Teammate';
-
-      if (isMA) {
-        entries.push({ type: 'assistant', content: respContent, timestamp: req.response?.timestamp || req.timestamp, requestIndex: startIdx + i, modelInfo });
-      } else if (isSub) {
-        const subToolResultMap = {};
-        const msgs = req.body?.messages || [];
-        for (const msg of msgs) {
-          if (msg.role === 'tool_result' || (msg.role === 'user' && Array.isArray(msg.content))) {
-            const blocks = Array.isArray(msg.content) ? msg.content : [msg];
-            for (const b of blocks) {
-              if (b.type === 'tool_result' && b.tool_use_id) {
-                subToolResultMap[b.tool_use_id] = { resultText: typeof b.content === 'string' ? b.content : JSON.stringify(b.content) };
-              }
-            }
-          }
-        }
-        entries.push({
-          type: 'sub-agent',
-          content: respContent,
-          toolResultMap: subToolResultMap,
-          label: cls.type === 'Teammate' ? formatTeammateLabel(cls.subType, req.body?.model) : formatRequestTag(cls.type, cls.subType),
-          isTeammate: cls.type === 'Teammate',
-          timestamp: req.timestamp,
-          requestIndex: startIdx + i,
-        });
-      }
-    }
-
-    // 按时间排序
-    entries.sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || ''));
-
-    // 提取每个 agent 的时间数据（用于状态卡片和甘特图）
-    const palette = ['#1668dc', '#52c41a', '#faad14', '#eb2f96', '#722ed1', '#13c2c2', '#fa541c', '#2f54eb'];
-    const teamAgents = [];
-    const agentMap = new Map(); // name → index in teamAgents
-    const teamTotalStart = new Date(teamStartTime).getTime();
-    const teamTotalEnd = new Date(teamEndTime || Date.now()).getTime();
-    // team-lead 活动段：[{ start, end, label, color }]
-    const leadSegments = [];
-    let lastLeadTs = teamTotalStart;
-    const _taskCreateSubjects = new Map(); // taskId → subject
-    const _taskOwnerMap = new Map(); // taskId → owner name (用于 completed 事件反查)
-    let _taskCreateCounter = 1;
-
-    for (let i = 0; i < teamRequests.length; i++) {
-      const req = teamRequests[i];
-      const resp = req.response?.body?.content;
-      if (!Array.isArray(resp)) continue;
-      const tsStr = req.response?.timestamp || req.timestamp;
-      const ts = tsStr;
-      const tsMs = new Date(tsStr).getTime();
-      // 检测 team-lead 活动（MainAgent 请求中的关键 tool_use）
-      const isMA = isMainAgent(req);
-      for (const block of resp) {
-        if (block.type !== 'tool_use') continue;
-        const n = block.name;
-        const inp = typeof block.input === 'string' ? (() => { try { return JSON.parse(block.input); } catch { return {}; } })() : (block.input || {});
-        if (n === 'Agent' && inp.name) {
-          const idx = teamAgents.length;
-          teamAgents.push({
-            name: inp.name,
-            color: palette[idx % palette.length],
-            type: inp.subagent_type?.split(':').pop() || '',
-            spawnTime: ts,
-            claimTime: null,
-            doneTime: null,
-            shutdownTime: null,
-            taskSubject: null,
-            // 细粒度事件节点（用于甘特分段）
-            events: [{ ts: tsMs, label: 'spawn' }],
-          });
-          agentMap.set(inp.name, idx);
-        } else if (n === 'TaskCreate') {
-          // Track task subjects for later association (normalize taskId to string)
-          if (inp.subject) {
-            const tId = String(inp.taskId || _taskCreateCounter++);
-            _taskCreateSubjects.set(tId, inp.subject);
-          }
-        } else if (n === 'TaskUpdate') {
-          const owner = inp.owner;
-          const taskId = inp.taskId != null ? String(inp.taskId) : null;
-          // 策略：多路径查找 taskId 对应的 agent
-          // 1. owner 直接匹配 agentMap
-          // 2. _taskOwnerMap 反查（之前记录的 taskId→owner）
-          // 3. 按 taskId 顺序匹配 agent（task #1→agent[0], #2→agent[1]...）
-
-          // 先记录 owner（如果有的话）
-          if (owner && taskId) _taskOwnerMap.set(taskId, owner);
-
-          let targetAg = null;
-          if (owner && agentMap.has(owner)) {
-            targetAg = teamAgents[agentMap.get(owner)];
-          } else if (taskId) {
-            const prevOwner = _taskOwnerMap.get(taskId);
-            if (prevOwner && agentMap.has(prevOwner)) {
-              targetAg = teamAgents[agentMap.get(prevOwner)];
-            } else {
-              // 兜底：按 taskId 数字顺序匹配 agent 索引（task #1→agent[0]）
-              const taskNum = parseInt(taskId, 10);
-              if (taskNum > 0 && taskNum <= teamAgents.length) {
-                targetAg = teamAgents[taskNum - 1];
-                _taskOwnerMap.set(taskId, targetAg.name);
-              }
-            }
-          }
-          if (targetAg) {
-            if (inp.status === 'in_progress' && !targetAg.claimTime) {
-              targetAg.claimTime = ts;
-              targetAg.events.push({ ts: tsMs, label: 'claim' });
-            }
-            if (inp.status === 'completed' && !targetAg.doneTime) {
-              targetAg.doneTime = ts;
-              targetAg.events.push({ ts: tsMs, label: 'done' });
-            }
-            if (taskId && _taskCreateSubjects.has(taskId) && !targetAg.taskSubject) {
-              targetAg.taskSubject = _taskCreateSubjects.get(taskId);
-            }
-          }
-        } else if (n === 'SendMessage') {
-          if (inp.message?.type === 'shutdown_request' && inp.to && agentMap.has(inp.to)) {
-            const ag = teamAgents[agentMap.get(inp.to)];
-            ag.shutdownTime = ts;
-            ag.events.push({ ts: tsMs, label: 'shutdown' });
-          } else if (inp.message?.type === 'shutdown_response' && agentMap.has(inp.to === 'team-lead' ? '' : inp.to)) {
-            // skip
-          } else if (inp.to && inp.to !== 'team-lead' && agentMap.has(inp.to)) {
-            // lead → agent message
-            teamAgents[agentMap.get(inp.to)].events.push({ ts: tsMs, label: 'msg-in' });
-          } else if (inp.to === 'team-lead') {
-            // agent → lead report: push a generic lead segment
-            if (typeof inp.message === 'string' || (inp.message && !inp.message.type)) {
-              if (tsMs > lastLeadTs) {
-                leadSegments.push({ start: lastLeadTs, end: tsMs, label: 'report-received', color: '#52c41a' });
-                lastLeadTs = tsMs;
-              }
-            }
-          }
-        }
-        // team-lead 关键事件段
-        if (isMA && (n === 'TeamCreate' || n === 'TaskCreate' || n === 'Agent' || n === 'SendMessage' || n === 'TeamDelete')) {
-          const label = n === 'TeamCreate' ? 'create' : n === 'TaskCreate' ? 'tasks' : n === 'Agent' ? 'spawn' : n === 'SendMessage' ? 'msg' : 'cleanup';
-          if (tsMs > lastLeadTs) {
-            leadSegments.push({ start: lastLeadTs, end: tsMs, label, color: n === 'TeamDelete' ? '#52c41a' : n === 'SendMessage' ? '#ff4d4f' : '#1668dc' });
-            lastLeadTs = tsMs;
-          }
-        }
-      }
-      // Lead text and thinking events (scan non-tool_use blocks in MainAgent responses)
-      if (isMA) {
-        for (const block of resp) {
-          if (block.type === 'text' && block.text) {
-            if (tsMs > lastLeadTs) {
-              leadSegments.push({ start: lastLeadTs, end: tsMs, label: 'text', color: '#196ae1' });
-              lastLeadTs = tsMs;
-            }
-          } else if (block.type === 'thinking') {
-            if (tsMs > lastLeadTs) {
-              leadSegments.push({ start: lastLeadTs, end: tsMs, label: 'thinking', color: '#722ed1' });
-              lastLeadTs = tsMs;
-            }
-          }
-        }
-      }
-    }
-    // Second pass: teammate own tool calls (non-MainAgent requests)
-    for (let i = 0; i < teamRequests.length; i++) {
-      const req = teamRequests[i];
-      if (isMainAgent(req)) continue;
-      const resp = req.response?.body?.content;
-      if (!Array.isArray(resp)) continue;
-      const tsStr = req.response?.timestamp || req.timestamp;
-      const tsMs = new Date(tsStr).getTime();
-      const cls = classifyRequest(req, teamRequests[i + 1]);
-      const label = cls.type === 'Teammate' ? cls.subType : null;
-      if (label) {
-        let agIdx = agentMap.has(label) ? agentMap.get(label) : undefined;
-        // Fallback: check if any agent name is contained in the label
-        if (agIdx === undefined) {
-          for (const [name, idx] of agentMap) {
-            if (label.includes(name) || name.includes(label)) { agIdx = idx; break; }
-          }
-        }
-        if (agIdx !== undefined) {
-          const ag = teamAgents[agIdx];
-          for (const block of resp) {
-            if (block.type === 'tool_use' && block.name) {
-              ag.events.push({ ts: tsMs, label: 'tool:' + block.name });
-            }
-          }
-        }
-      }
-    }
-
-    // 提取 <teammate-message> 报告内容（在主 agent 的 body.messages 中）
-    const teammateMessageRe = /<teammate-message\s+teammate_id="([^"]+)"[^>]*summary="([^"]*)"[^>]*>([\s\S]*?)<\/teammate-message>/g;
-    const seenTmMsg = new Set(); // 去重：同一 teammate-message 会出现在多个请求的累积 messages 中
-    teamAgents.forEach(ag => { ag.teammateMessages = []; });
-    for (let i = 0; i < teamRequests.length; i++) {
-      const req = teamRequests[i];
-      const msgs = req.body?.messages || [];
-      for (const m of msgs) {
-        if (m.role !== 'user' || !Array.isArray(m.content)) continue;
-        for (const b of m.content) {
-          if (b.type !== 'text' || !b.text) continue;
-          let match;
-          teammateMessageRe.lastIndex = 0;
-          while ((match = teammateMessageRe.exec(b.text)) !== null) {
-            const [, tid, summary, content] = match;
-            if (tid === 'system' || tid === 'team-lead') continue;
-            const dedupKey = tid + '|' + summary + '|' + content.trim().slice(0, 100);
-            if (seenTmMsg.has(dedupKey)) continue;
-            seenTmMsg.add(dedupKey);
-            // 匹配到 agent，同时推入 entries 以在对话流中显示
-            for (const ag of teamAgents) {
-              if (tid === ag.name || tid.includes(ag.name) || ag.name.includes(tid)) {
-                if (summary && content.trim()) {
-                  ag.teammateMessages.push({ summary, content: content.trim() });
-                  const reqTs = req.timestamp || req.response?.timestamp;
-                  entries.push({ type: 'teammate-report', agentName: ag.name, agentColor: getTeammateAvatar(ag.name).color, summary, content: content.trim(), timestamp: reqTs });
-                }
-                break;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // 闭合 lead 最后一段
-    if (lastLeadTs < teamTotalEnd) {
-      leadSegments.push({ start: lastLeadTs, end: teamTotalEnd, label: 'idle', color: '#333' });
-    }
-
-    // 从事件节点构建每个 agent 的分段 + 计算持续时间
-    const segColors = { spawn: '#555', claim: '#faad14', done: '#52c41a', shutdown: '#ff4d4f', 'msg-in': '#1668dc', report: '#52c41a', 'report-received': '#52c41a', text: '#196ae1', thinking: '#722ed1' };
-    teamAgents.forEach(ag => {
-      const start = new Date(ag.spawnTime).getTime();
-      const end = new Date(ag.doneTime || ag.shutdownTime || teamEndTime || Date.now()).getTime();
-      ag.duration = end - start;
-      // 按时间排序事件，构建相邻段
-      ag.events.sort((a, b) => a.ts - b.ts);
-      ag.segments = [];
-      for (let e = 0; e < ag.events.length; e++) {
-        const ev = ag.events[e];
-        const nextTs = ag.events[e + 1]?.ts || (ag.shutdownTime ? new Date(ag.shutdownTime).getTime() : teamTotalEnd);
-        ag.segments.push({ start: ev.ts, end: nextTs, label: ev.label, color: segColors[ev.label] || (ev.label.startsWith('tool:') ? '#888' : ag.color) });
-      }
-    });
-
-    const result = { entries, teamAgents, leadSegments, teamTotalStart, teamTotalEnd, modelInfo, teamRequests };
+    const c = this._teamModalDataCache;
+    if (c && c.team === team && c.requests === requests && c.mainAgentSessions === mainAgentSessions) return c.result;
+    const result = buildTeamModalData(team, requests, mainAgentSessions);
     this._teamModalDataCache = { team, requests, mainAgentSessions, result };
     return result;
   }
