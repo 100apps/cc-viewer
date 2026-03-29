@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { readFileSync, writeFileSync, existsSync, realpathSync, unlinkSync, mkdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
 import { spawn } from 'node:child_process';
@@ -508,21 +508,24 @@ if (isLogger) {
   let mode = 'unknown';
 
   let prefersNative = true;
-  const paths = (process.env.PATH || '').split(':');
+  const paths = (process.env.PATH || '').split(delimiter);
+  const exeNames = process.platform === 'win32' ? ['claude.exe', 'claude.cmd', 'claude'] : ['claude'];
   for (const dir of paths) {
     if (!dir) continue;
-    const exePath = resolve(dir, 'claude');
-    if (existsSync(exePath)) {
-      try {
-        const real = realpathSync(exePath);
-        if (real.includes('node_modules')) {
-          prefersNative = false;
-        } else {
-          prefersNative = true;
+    for (const name of exeNames) {
+      const exePath = resolve(dir, name);
+      if (existsSync(exePath)) {
+        try {
+          const real = realpathSync(exePath);
+          if (real.includes('node_modules')) {
+            prefersNative = false;
+          } else {
+            prefersNative = true;
+          }
+          break;
+        } catch (e) {
+          // ignore
         }
-        break;
-      } catch (e) {
-        // ignore
       }
     }
   }

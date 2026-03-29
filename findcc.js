@@ -33,12 +33,21 @@ export const PACKAGES = ['@anthropic-ai/claude-code', '@ali/claude-code'];
 export const CLI_ENTRY = 'cli.js';
 
 // native 二进制候选路径（~ 会在运行时展开为 homedir()）
-const NATIVE_CANDIDATES = [
-  '~/.claude/local/claude',
-  '/usr/local/bin/claude',
-  '~/.local/bin/claude',
-  '/opt/homebrew/bin/claude',
-];
+const isWindows = process.platform === 'win32';
+
+const NATIVE_CANDIDATES = isWindows
+  ? [
+    // Windows native candidates
+    join(process.env.LOCALAPPDATA || '', 'Programs', 'claude', 'claude.exe'),
+    join(process.env.APPDATA || '', 'Claude', 'claude.exe'),
+    join(homedir(), '.claude', 'local', 'claude.exe'),
+  ]
+  : [
+    '~/.claude/local/claude',
+    '/usr/local/bin/claude',
+    '~/.local/bin/claude',
+    '/opt/homebrew/bin/claude',
+  ];
 
 // 用于 which/command -v 查找的命令名
 export const BINARY_NAME = 'claude';
@@ -81,12 +90,16 @@ export function resolveCliPath() {
  * 返回 node_modules 中的 claude cli.js 路径
  */
 export function resolveNpmClaudePath() {
-  // 1. 尝试 which/command -v 找到 npm 安装的 claude
-  for (const cmd of [`which ${BINARY_NAME}`, `command -v ${BINARY_NAME}`]) {
+  // 1. 尝试 which/command -v/where 找到 npm 安装的 claude
+  const lookupCmds = isWindows
+    ? [`where ${BINARY_NAME} 2>nul`, `where ${BINARY_NAME}.cmd 2>nul`]
+    : [`which ${BINARY_NAME}`, `command -v ${BINARY_NAME}`];
+  for (const cmd of lookupCmds) {
     try {
-      const result = execSync(cmd, { encoding: 'utf-8', shell: true, env: process.env }).trim();
-      // 排除 shell function 的输出（多行说明不是路径）
-      if (result && !result.includes('\n') && existsSync(result)) {
+      const rawResult = execSync(cmd, { encoding: 'utf-8', shell: true, env: process.env }).trim();
+      // Windows 'where' may return multiple lines; take the first
+      const result = rawResult.split(/\r?\n/)[0].trim();
+      if (result && existsSync(result)) {
         // 只接受 npm 安装的符号链接（解析后指向 node_modules）
         try {
           const real = realpathSync(result);
@@ -94,7 +107,7 @@ export function resolveNpmClaudePath() {
             // 找到 npm 版本，返回 cli.js 的路径
             // real 可能是 .../node_modules/@anthropic-ai/claude-code/bin/claude
             // 我们需要返回 .../node_modules/@anthropic-ai/claude-code/cli.js
-            const match = real.match(/(.*node_modules\/@[^/]+\/[^/]+)\//);
+            const match = real.match(/(.*node_modules[\\/]@[^\\/]+[\\/][^\\/]+)[\\/]/);
             if (match) {
               const packageDir = match[1];
               const cliPath = join(packageDir, CLI_ENTRY);
@@ -125,12 +138,16 @@ export function resolveNpmClaudePath() {
 }
 
 export function resolveNativePath() {
-  // 1. 尝试 which/command -v（继承当前 process.env PATH）
-  for (const cmd of [`which ${BINARY_NAME}`, `command -v ${BINARY_NAME}`]) {
+  // 1. 尝试 which/command -v/where（继承当前 process.env PATH）
+  const lookupCmds = isWindows
+    ? [`where ${BINARY_NAME}.exe 2>nul`, `where ${BINARY_NAME} 2>nul`]
+    : [`which ${BINARY_NAME}`, `command -v ${BINARY_NAME}`];
+  for (const cmd of lookupCmds) {
     try {
-      const result = execSync(cmd, { encoding: 'utf-8', shell: true, env: process.env }).trim();
-      // 排除 shell function 的输出（多行说明不是路径）
-      if (result && !result.includes('\n') && existsSync(result)) {
+      const rawResult = execSync(cmd, { encoding: 'utf-8', shell: true, env: process.env }).trim();
+      // Windows 'where' may return multiple lines; take the first
+      const result = rawResult.split(/\r?\n/)[0].trim();
+      if (result && existsSync(result)) {
         // 排除 npm 安装的符号链接（解析后指向 node_modules）
         try {
           const real = realpathSync(result);
@@ -146,10 +163,10 @@ export function resolveNativePath() {
   // 2. 检查常见 native 安装路径
   const home = homedir();
   const candidates = NATIVE_CANDIDATES.map(p =>
-    p.startsWith('~') ? join(home, p.slice(2)) : p
+    typeof p === 'string' && p.startsWith('~') ? join(home, p.slice(2)) : p
   );
   for (const p of candidates) {
-    if (existsSync(p)) {
+    if (p && existsSync(p)) {
       return p;
     }
   }
